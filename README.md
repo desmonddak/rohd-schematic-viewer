@@ -18,7 +18,7 @@ relevant to an investigation.
 
 **[Open the hosted ROHD Schematic Viewer](https://intel.github.io/rohd-schematic-viewer/)**
 
-[![Watch the ROHD Schematic Viewer demo](images/filter_bank_schematic.png)](https://github.com/user-attachments/assets/2e3e70cc-5a71-4585-baf7-370c9444a002)
+[![Watch the ROHD Schematic Viewer demo](images/filter_bank_schematic.png)](images/schematic-demo.mp4)
 
 *Click the image to watch the viewer progressively expand a design and reveal
 the connections that matter.*
@@ -33,11 +33,9 @@ Publishing checklist for https://github.com/intel/rohd-schematic-viewer:
    renders the inline video player.
 3. Verify playback from the rendered README, then delete the committed MP4s if
    the local fallbacks are no longer wanted.
-
-   Inline advice:  place in an issue and use that link.
 -->
 
-## Generate a Netlist Directly with ROHD
+## Prepare a Netlist
 
 ROHD Schematic Viewer requires a netlist in the
 [Yosys JSON netlist format](https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_backends.html#write-json-write-design-to-a-json-file).
@@ -45,7 +43,6 @@ Plain Yosys JSON is sufficient for schematic exploration. For a ROHD design,
 build the top-level module and pass it to `NetlistService`; ROHD-generated
 netlists can also preserve ROHD types for structured signals:
 
-<!-- This is a future API change
 ```dart
 final dut = MyModule(...);
 await dut.build();
@@ -57,7 +54,9 @@ final netlist = NetlistService(
 ```
 
 `NetlistService` is the supported API for generating the netlist.
--->
+
+<!--
+### Generate a Netlist Directly with ROHD
 
 You can generate a netlist from any ROHD top-level module with a small Dart
 program. Replace `MyModule` with the top-level module from your design, and
@@ -66,6 +65,7 @@ make sure the program is run from a Dart or Flutter package that depends on
 
 ```dart
 import 'dart:io';
+
 import 'package:rohd/rohd.dart';
 
 Future<void> main() async {
@@ -92,6 +92,7 @@ dart run tool/generate_netlist.dart
 Then open `build/my_hardware.rohd.json` in the viewer. For source navigation
 metadata in the VS Code extension, use the `NetlistService` example below
 instead.
+-->
 
 ## Choose How to Open the Viewer
 
@@ -129,7 +130,7 @@ picker to open another Yosys JSON netlist. This standalone application does not
 currently provide services beyond schematic exploration.
 
 Instructions for building and running desktop, web, and VS Code extension
-configurations are in [doc/BUILD.md](doc/BUILD.md).
+configurations are in [docs/BUILD.md](docs/BUILD.md).
 
 ## Quick Start
 
@@ -246,7 +247,7 @@ ROHD Schematic Viewer reads the **Yosys JSON netlist format**:
 See the
 [Yosys `write_json` documentation](https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_backends.html#write-json-write-design-to-a-json-file)
 for the base format and
-[doc/netlist_json_format.md](doc/netlist_json_format.md) for the ROHD-specific
+[docs/netlist_json_format.md](docs/netlist_json_format.md) for the ROHD-specific
 extensions supported by the viewer.
 
 ## Troubleshooting
@@ -284,9 +285,9 @@ File/Line/Column source information.
 
 This README is the user guide. Instructions for selecting dependency modes,
 running Flutter configurations, packaging the VS Code extension, and
-troubleshooting builds are in [doc/BUILD.md](doc/BUILD.md).
+troubleshooting builds are in [docs/BUILD.md](docs/BUILD.md).
 
-- [Developer documentation map](doc/README.md)
+- [Developer documentation map](docs/README.md)
 - [Report an issue](https://github.com/intel/rohd-schematic-viewer/issues)
 - [ROHD](https://github.com/intel/rohd)
 - [Yosys](https://github.com/YosysHQ/yosys)
