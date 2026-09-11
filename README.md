@@ -34,7 +34,7 @@ ROHD Schematic Viewer requires a netlist in the
 [Yosys JSON netlist format](https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_backends.html#write-json-write-design-to-a-json-file).
 Plain Yosys JSON is sufficient for schematic exploration. For a ROHD design,
 build the top-level module and pass it to `NetlistService`; ROHD-generated
-netlists can also preserve ROHD type metadata for structured signals:
+netlists can also preserve ROHD types for structured signals:
 
 ```dart
 final dut = MyModule(...);
