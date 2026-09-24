@@ -30,6 +30,16 @@ flutter pub get
 The backup is named `pubspec_overrides.yaml.disabled` (with a numeric suffix
 if needed) and is ignored by Git.
 
+### Configure sources from VS Code
+
+Use **Configure ROHD Dependency Sources** to select `hosted`, `git`, or
+`local` independently for each ROHD package. The task prompts once for each
+package, writes the ignored `pubspec_overrides.yaml`, and runs `flutter pub
+get`. This is the preferred workflow when testing a mixed configuration.
+
+The build and run tasks do not prompt. They use the configuration selected by
+the configure task, or the hosted manifest when no override exists.
+
 ### Assumed local development directories
 
 Local dependency mode assumes that the ROHD monorepo is checked out at:

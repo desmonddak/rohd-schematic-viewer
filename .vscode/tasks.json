@@ -2,6 +2,14 @@
     "version": "2.0.0",
     "tasks": [
         {"label": "Use Manifest Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh manifest && flutter pub get", "problemMatcher": []},
+        {
+            "label": "Configure ROHD Dependency Sources",
+            "type": "shell",
+            "command": "bash scripts/schematic_dev_mode.sh configure rohd ${input:rohdSource} rohd_hierarchy ${input:hierarchySource} rohd_devtools_widgets ${input:widgetsSource} rohd_source_navigator ${input:navigatorSource} && flutter pub get",
+            "options": {"cwd": "${workspaceFolder}"},
+            "problemMatcher": [],
+            "detail": "Select hosted, Git, or local independently for each ROHD package."
+        },
         {"label": "Use Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-rohd && flutter pub get", "problemMatcher": []},
         {"label": "Use Local ROHD Extension Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-extension && flutter pub get", "problemMatcher": []},
         {"label": "Use All Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-all && flutter pub get", "problemMatcher": []},
@@ -38,5 +46,35 @@
             "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
         },
         {"label": "Show Schematic Viewer Dependency Mode", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh show", "problemMatcher": []}
+    ],
+    "inputs": [
+        {
+            "id": "rohdSource",
+            "type": "pickString",
+            "description": "Source for rohd",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        },
+        {
+            "id": "hierarchySource",
+            "type": "pickString",
+            "description": "Source for rohd_hierarchy",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        },
+        {
+            "id": "widgetsSource",
+            "type": "pickString",
+            "description": "Source for rohd_devtools_widgets",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        },
+        {
+            "id": "navigatorSource",
+            "type": "pickString",
+            "description": "Source for rohd_source_navigator",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        }
     ]
 }
