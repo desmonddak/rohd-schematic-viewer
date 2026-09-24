@@ -49,8 +49,8 @@ flutter pub downgrade
 flutter analyze --fatal-infos --no-pub
 
 echo "=== Pana score gate ==="
-# This is an application rather than a pub.dev package. Allow the intentional
-# publish_to: none deduction and the current partial API documentation score.
+# Allow the current partial API documentation score while requiring all other
+# package-quality checks to pass.
 PANA_ANALYSIS_INCLUDES=0 \
-  pana --exit-code-threshold "${PANA_SCORE_THRESHOLD:-20}" \
+  pana --exit-code-threshold "${PANA_SCORE_THRESHOLD:-10}" \
   --flutter-sdk "$flutter_root" .
