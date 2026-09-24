@@ -2,7 +2,7 @@
 
 ## VS Code tasks and dependency sources
 
-The tasks in [`.vscode/tasks.json`](.vscode/tasks.json) do not select
+The tasks in [`.vscode/tasks.json`](../.vscode/tasks.json) do not select
 dependency sources. They build or run using the dependency configuration that
 is already present in the workspace.
 
@@ -14,7 +14,7 @@ unhelpful cross-product of combinations.
 
 ### Default: hosted packages
 
-The release dependencies in [`pubspec.yaml`](pubspec.yaml) are hosted on
+The release dependencies in [`pubspec.yaml`](../pubspec.yaml) are hosted on
 pub.dev. If `pubspec_overrides.yaml` does not exist, `flutter pub get` uses
 those manifest dependencies. This is the default and requires no setup.
 
@@ -40,7 +40,7 @@ Local dependency mode assumes that the ROHD monorepo is checked out at:
 
 This checkout should contain the ROHD package at its root and the companion
 packages under `packages/`. The path is used by
-[`scripts/schematic_dev_mode.sh`](scripts/schematic_dev_mode.sh) when a
+[`scripts/schematic_dev_mode.sh`](../scripts/schematic_dev_mode.sh) when a
 package is configured as `local`.
 
 If the checkout is elsewhere, set `ROHD_LOCAL_PATH` before configuring local
