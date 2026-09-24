@@ -1,4 +1,5 @@
-## 0.1.0
+
+# 0.1.0
 
 - Initial release of the ROHD Schematic Viewer.
 - Added interactive schematic visualization for Yosys JSON netlists.
