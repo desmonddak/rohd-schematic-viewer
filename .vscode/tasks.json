@@ -1,0 +1,42 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {"label": "Use Manifest Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh manifest && flutter pub get", "problemMatcher": []},
+        {"label": "Use Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-rohd && flutter pub get", "problemMatcher": []},
+        {"label": "Use Local ROHD Extension Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-extension && flutter pub get", "problemMatcher": []},
+        {"label": "Use All Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-all && flutter pub get", "problemMatcher": []},
+        {
+            "label": "ROHD Schematic Viewer: Web Debug",
+            "type": "shell",
+            "command": "flutter pub get && bash scripts/schematic_run.sh web-debug",
+            "isBackground": true,
+            "problemMatcher": {"pattern": {"regexp": "^$"}, "background": {"activeOnStart": true, "beginsPattern": "^Launching", "endsPattern": "is being served at"}},
+            "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+        },
+        {
+            "label": "ROHD Schematic Viewer: Web Release WASM",
+            "type": "shell",
+            "command": "flutter pub get && bash scripts/schematic_run.sh web-release",
+            "isBackground": true,
+            "problemMatcher": {"pattern": {"regexp": "^$"}, "background": {"activeOnStart": true, "beginsPattern": "^Launching", "endsPattern": "is being served at"}},
+            "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+        },
+        {
+            "label": "ROHD Schematic Viewer: Linux Debug",
+            "type": "shell",
+            "command": "flutter pub get && bash scripts/schematic_run.sh linux-debug",
+            "isBackground": true,
+            "problemMatcher": {"pattern": {"regexp": "^$"}, "background": {"activeOnStart": true, "beginsPattern": "^Running Flutter", "endsPattern": "^Application finished"}},
+            "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+        },
+        {
+            "label": "ROHD Schematic Viewer: Linux Release",
+            "type": "shell",
+            "command": "flutter pub get && bash scripts/schematic_run.sh linux-release",
+            "isBackground": true,
+            "problemMatcher": {"pattern": {"regexp": "^$"}, "background": {"activeOnStart": true, "beginsPattern": "^Running Flutter", "endsPattern": "^Application finished"}},
+            "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+        },
+        {"label": "Show Schematic Viewer Dependency Mode", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh show", "problemMatcher": []}
+    ]
+}

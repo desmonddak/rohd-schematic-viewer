@@ -1,0 +1,101 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        // ============================================================
+        // Extension configurations
+        // ============================================================
+        {
+            "name": "Extension (workspace)",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--user-data-dir=${workspaceFolder}/.vscode-test-user-data"
+            ],
+            "outFiles": [],
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Extension (built)",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/build/extension",
+                "--user-data-dir=${workspaceFolder}/.vscode-test-user-data"
+            ],
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Extension (workspace) + Debug",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "runtimeArgs": [
+                "--nolazy",
+                "--inspect-brk=9229"
+            ],
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--user-data-dir=${workspaceFolder}/.vscode-test-user-data"
+            ],
+            "outFiles": [],
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Extension (built) + Debug",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "runtimeArgs": [
+                "--nolazy",
+                "--inspect-brk=9230"
+            ],
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/build/extension",
+                "--user-data-dir=${workspaceFolder}/.vscode-test-user-data"
+            ],
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        // ============================================================
+        // Web configurations
+        // ============================================================
+        {
+            "name": "Web (Simple Browser)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "web-server",
+            "args": [
+                "--web-port=9199",
+                "--web-hostname=localhost"
+            ]
+        },
+        {
+            "name": "Web (Chrome)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "chrome"
+        },
+        // ============================================================
+        // Linux Native configurations
+        // ============================================================
+        {
+            "name": "Linux Native",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "linux"
+        },
+        {
+            "name": "Linux Native (profile)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "linux",
+            "flutterMode": "profile"
+        }
+    ]
+}

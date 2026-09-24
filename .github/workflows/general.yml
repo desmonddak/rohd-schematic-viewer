@@ -41,6 +41,9 @@ jobs:
       - name: Verify Flutter on PATH
         run: bash scripts/verify_flutter_version.sh
 
+      - name: Setup Pana source analysis
+        run: tool/gh_actions/install_pana.sh
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -54,6 +57,9 @@ jobs:
 
       - name: Analyze project source
         run: tool/gh_actions/analyze_source.sh
+
+      - name: Gate hosted dependencies and Pana score
+        run: tool/gh_actions/pana_source.sh
 
       - name: Check project documentation
         run: tool/gh_actions/generate_documentation.sh
