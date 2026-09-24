@@ -15,37 +15,27 @@ cd "$(dirname "$0")/.."
 
 bash scripts/verify_flutter_version.sh
 
-mode="${1:-}"
-mode="${mode%% *}"
-run_mode="${2:-}"
+run_mode="${1:-}"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/schematic_run.sh <dependency-mode> <run-mode>
+Usage: scripts/schematic_run.sh <run-mode>
 
-Dependency modes:
-  manifest         Use pubspec.yaml dependency sources.
-  local-rohd       Local ROHD + hierarchy; Git DevTools-extension packages.
-  local-extension  Pub.dev ROHD; local hierarchy + DevTools-extension packages.
-  local-all        Local ROHD, hierarchy, and DevTools-extension packages.
+Dependency sources are selected separately with scripts/schematic_dev_mode.sh.
+This command runs using the currently generated dependency configuration.
 Run modes: web-debug, web-release, linux-debug, linux-release
 USAGE
 }
 
-if [[ -z "$mode" || -z "$run_mode" ]]; then
+if [[ -z "$run_mode" ]]; then
   usage >&2
   exit 2
 fi
-
-case "$mode" in
-  -h|--help|help) usage; exit 0 ;;
-esac
 
 case "$run_mode" in
   -h|--help|help) usage; exit 0 ;;
 esac
 
-bash scripts/schematic_dev_mode.sh "$mode"
 flutter pub get
 
 case "$run_mode" in

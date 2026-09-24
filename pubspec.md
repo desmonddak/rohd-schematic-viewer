@@ -4,27 +4,54 @@ This file documents non-obvious dependency choices in [pubspec.yaml](pubspec.yam
 
 ## ROHD Dependencies
 
-The baseline dependency mode uses the ROHD `v0.6.10` release tag for the core
-package and companion packages from `https://github.com/intel/rohd.git`.
-Until the popup menu fix is released, the temporary `dependency_overrides`
-block in `pubspec.yaml` replaces all of them with the named branch
-`fix/devtools-popup-menu-material-ui` from
-`https://github.com/desmonddak/rohd.git`.
+The release `pubspec.yaml` uses hosted ROHD packages from pub.dev:
 
-`pubspec.yaml` depends on several ROHD packages from the GitHub monorepo:
-
+- `rohd` `^0.6.11`
 - `rohd_devtools_widgets`
 - `rohd_hierarchy`
 - `rohd_source_navigator`
 
-The packages are all resolved from the same Git repository and branch so that
-their APIs remain compatible.
+Development-only Git and local modes remain available through
+`scripts/schematic_dev_mode.sh` and the ignored `pubspec_overrides.yaml`; the
+release manifest itself contains no dependency overrides.
 
-## Local Dependency Modes
+## Dependency Modes
 
-Local modes are handled outside `pubspec.yaml` by `scripts/schematic_dev_mode.sh`, which writes an ignored `pubspec_overrides.yaml` file.
+The VS Code run tasks use the dependency source already configured in the
+workspace; they do not prompt during every build:
 
-The default local checkout is `~/release/rohd`. Configure all ROHD package
+- `hosted`: resolve ROHD and companion packages from pub.dev. This is the
+  release/default mode.
+- `git`: resolve an explicitly selected package from the configured Git
+  repository and tag or branch.
+- `local`: resolve an explicitly selected package from the local checkout.
+
+Sources can be selected independently because larger applications may depend
+on several viewers or tools. This avoids a cross-product of all possible
+dependency-mode combinations.
+
+The modes are handled outside `pubspec.yaml` by
+`scripts/schematic_dev_mode.sh`, which writes an ignored
+`pubspec_overrides.yaml` file.
+
+For example:
+
+```bash
+bash scripts/schematic_dev_mode.sh configure \
+  rohd git \
+  rohd_hierarchy hosted \
+  rohd_devtools_widgets local
+flutter pub get
+```
+
+If no override file is present, the manifest dependencies are used and hosted
+pub.dev packages are the default.
+
+Git mode defaults to the `v0.6.11` tag to match the hosted ROHD baseline. Set
+`ROHD_GIT_URL` and `ROHD_GIT_REF` to test another ROHD repository or branch;
+the selected ref is applied consistently to every Git-sourced ROHD package.
+
+The default local checkout is `~/release/rohd`. Configure local package
 sources from it with:
 
 ```bash
@@ -42,3 +69,7 @@ To return to the manifest dependencies:
 bash scripts/schematic_dev_mode.sh manifest
 flutter pub get
 ```
+
+If a generated override file exists, `manifest` moves it to the ignored
+`pubspec_overrides.yaml.disabled` backup (adding a numeric suffix when needed)
+instead of deleting it.

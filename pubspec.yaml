@@ -5,8 +5,6 @@ repository: https://github.com/intel/rohd-schematic-viewer
 version: 0.1.0
 issue_tracker: https://github.com/intel/rohd-schematic-viewer/issues
 
-publish_to: none
-
 environment:
   sdk: '>=3.6.0 <4.0.0'
   flutter: '>=3.44.0'
@@ -23,30 +21,14 @@ dependencies:
     sdk: flutter
   material_ui: ^1.1.0
   # Application version from pubspec metadata
-  package_info_plus: ^9.0.1
-  # ROHD release baseline; temporarily overridden below until the fix ships.
-  rohd:
-    git:
-      url: https://github.com/intel/rohd.git
-      ref: v0.6.10
+  package_info_plus: ^10.2.1
+  rohd: ^0.6.11
   # Shared widgets (help, overlay, PNG export)
-  rohd_devtools_widgets:
-    git:
-      url: https://github.com/intel/rohd.git
-      ref: v0.6.10
-      path: rohd_devtools_extension/packages/rohd_devtools_widgets
+  rohd_devtools_widgets: ^0.1.1
   # Hierarchy API for hardware module navigation
-  rohd_hierarchy:
-    git:
-      url: https://github.com/intel/rohd.git
-      ref: v0.6.10
-      path: packages/rohd_hierarchy
+  rohd_hierarchy: ^0.1.0
   # Source navigator (FLC data model, frame types)
-  rohd_source_navigator:
-    git:
-      url: https://github.com/intel/rohd.git
-      ref: v0.6.10
-      path: rohd_extension/dart
+  rohd_source_navigator: ^0.1.0
   web: ^1.0.0
 
 dev_dependencies:
@@ -54,28 +36,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   test: ^1.24.9
-
-# Temporary branch override until the popup-menu fix is released.
-dependency_overrides:
-  rohd:
-    git:
-      url: https://github.com/desmonddak/rohd.git
-      ref: fix/devtools-popup-menu-material-ui
-  rohd_devtools_widgets:
-    git:
-      url: https://github.com/desmonddak/rohd.git
-      ref: fix/devtools-popup-menu-material-ui
-      path: rohd_devtools_extension/packages/rohd_devtools_widgets
-  rohd_hierarchy:
-    git:
-      url: https://github.com/desmonddak/rohd.git
-      ref: fix/devtools-popup-menu-material-ui
-      path: packages/rohd_hierarchy
-  rohd_source_navigator:
-    git:
-      url: https://github.com/desmonddak/rohd.git
-      ref: fix/devtools-popup-menu-material-ui
-      path: rohd_extension/dart
 
 flutter:
   uses-material-design: true

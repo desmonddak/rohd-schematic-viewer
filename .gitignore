@@ -8,6 +8,7 @@ node_modules/
 .packages
 pubspec.lock
 pubspec_overrides.yaml
+pubspec_overrides.yaml.disabled*
 
 # Directory created by dartdoc
 doc/api
@@ -33,4 +34,3 @@ linux/flutter/generated_plugins.cmake
 *.iml
 *.ipr
 *.iws
-
