@@ -7,6 +7,10 @@
 // 2026 January
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
+// Compatibility constructor intentionally delegates to the preferred APIs.
+// ignore_for_file: deprecated_member_use_from_same_package
+// ignore_for_file: remove_deprecations_in_breaking_versions
+
 import 'dart:async' show Completer, unawaited;
 import 'dart:convert' show jsonDecode, jsonEncode;
 
@@ -67,8 +71,14 @@ class EmbeddedSchematicViewer extends StatefulWidget {
   /// If provided, both `schematicJson` and `assetPath` are ignored.
   final Map<String, dynamic>? netlistJsonMap;
 
-  /// Initial theme mode for the schematic viewer.
-  /// When provided, the embedded viewer will start with this theme mode.
+  /// Theme mode controlled by the embedding application.
+  ///
+  /// Runtime changes are applied without recreating the viewer.
+  final SchematicThemeMode? themeMode;
+
+  /// Initial theme mode for backward-compatible uncontrolled use.
+  ///
+  /// Ignored when [themeMode] is provided.
   final SchematicThemeMode? initialThemeMode;
 
   /// External hierarchy service from the parent application.
@@ -158,18 +168,30 @@ class EmbeddedSchematicViewer extends StatefulWidget {
   /// `null` / omit to show all go-to options unconditionally.
   final RohdExtensionClient? extensionClient;
 
-  /// Controls the initial expansion state after loading.
+  /// Expansion mode controlled by the embedding application.
+  ///
+  /// Runtime changes reload the current schematic using the requested mode.
+  final SchematicExpansionMode? expansionMode;
+
+  /// Controls the initial expansion state for backward-compatible
+  /// uncontrolled use.
   ///
   /// Defaults to `SchematicExpansionMode.defaultView` (top module shows
-  /// non-primitive sub-modules as blocks, no wires).
+  /// non-primitive sub-modules as blocks, no wires). Ignored when
+  /// [expansionMode] is provided.
   final SchematicExpansionMode initialExpansionMode;
 
   /// Constructor for `EmbeddedSchematicViewer`.
+  @Deprecated(
+    'Use EmbeddedSchematicViewer.fromJson, fromNetlistMap, fromHierarchy, '
+    'or fromAsset.',
+  )
   const EmbeddedSchematicViewer({
     super.key,
     this.assetPath,
     this.schematicJson,
     this.netlistJsonMap,
+    this.themeMode,
     this.initialThemeMode,
     this.externalHierarchy,
     this.onModuleSelected,
@@ -184,8 +206,185 @@ class EmbeddedSchematicViewer extends StatefulWidget {
     this.incomingSignalPaths,
     this.crossProbeService,
     this.extensionClient,
+    this.expansionMode,
     this.initialExpansionMode = SchematicExpansionMode.defaultView,
   });
+
+  /// Creates a viewer backed by a Yosys-compatible JSON string.
+  const EmbeddedSchematicViewer.fromJson({
+    required String schematicJson,
+    Key? key,
+    SchematicThemeMode? themeMode,
+    SchematicThemeMode? initialThemeMode,
+    HierarchyService? externalHierarchy,
+    ValueChanged<HierarchyOccurrence?>? onModuleSelected,
+    HierarchyOccurrence? selectedModule,
+    bool isVisible = true,
+    ({String value, bool computed, String signalId})? Function(String wireName)?
+        signalValueLookupFn,
+    ValueChanged<Map<String, dynamic>>? onNetlistEnriched,
+    void Function(List<String> signalPaths)? onSendSignals,
+    bool hasExternalSignalListeners = false,
+    GoToSourceCallback? onGoToSourceCallback,
+    ValueNotifier<List<String>?>? incomingSignalPaths,
+    CrossProbeService? crossProbeService,
+    RohdExtensionClient? extensionClient,
+    SchematicExpansionMode? expansionMode,
+    SchematicExpansionMode initialExpansionMode =
+        SchematicExpansionMode.defaultView,
+  }) : this(
+          key: key,
+          schematicJson: schematicJson,
+          themeMode: themeMode,
+          initialThemeMode: initialThemeMode,
+          externalHierarchy: externalHierarchy,
+          onModuleSelected: onModuleSelected,
+          selectedModule: selectedModule,
+          isVisible: isVisible,
+          signalValueLookupFn: signalValueLookupFn,
+          onNetlistEnriched: onNetlistEnriched,
+          onSendSignals: onSendSignals,
+          hasExternalSignalListeners: hasExternalSignalListeners,
+          onGoToSourceCallback: onGoToSourceCallback,
+          incomingSignalPaths: incomingSignalPaths,
+          crossProbeService: crossProbeService,
+          extensionClient: extensionClient,
+          expansionMode: expansionMode,
+          initialExpansionMode: initialExpansionMode,
+        );
+
+  /// Creates a viewer backed by a parsed Yosys-compatible netlist map.
+  const EmbeddedSchematicViewer.fromNetlistMap({
+    required Map<String, dynamic> netlistJsonMap,
+    Key? key,
+    SchematicThemeMode? themeMode,
+    SchematicThemeMode? initialThemeMode,
+    HierarchyService? externalHierarchy,
+    ValueChanged<HierarchyOccurrence?>? onModuleSelected,
+    HierarchyOccurrence? selectedModule,
+    bool isVisible = true,
+    ({String value, bool computed, String signalId})? Function(String wireName)?
+        signalValueLookupFn,
+    Future<Map<String, dynamic>?> Function(String definitionName)?
+        fetchModuleNetlist,
+    ValueChanged<Map<String, dynamic>>? onNetlistEnriched,
+    void Function(List<String> signalPaths)? onSendSignals,
+    bool hasExternalSignalListeners = false,
+    GoToSourceCallback? onGoToSourceCallback,
+    ValueNotifier<List<String>?>? incomingSignalPaths,
+    CrossProbeService? crossProbeService,
+    RohdExtensionClient? extensionClient,
+    SchematicExpansionMode? expansionMode,
+    SchematicExpansionMode initialExpansionMode =
+        SchematicExpansionMode.defaultView,
+  }) : this(
+          key: key,
+          netlistJsonMap: netlistJsonMap,
+          themeMode: themeMode,
+          initialThemeMode: initialThemeMode,
+          externalHierarchy: externalHierarchy,
+          onModuleSelected: onModuleSelected,
+          selectedModule: selectedModule,
+          isVisible: isVisible,
+          signalValueLookupFn: signalValueLookupFn,
+          fetchModuleNetlist: fetchModuleNetlist,
+          onNetlistEnriched: onNetlistEnriched,
+          onSendSignals: onSendSignals,
+          hasExternalSignalListeners: hasExternalSignalListeners,
+          onGoToSourceCallback: onGoToSourceCallback,
+          incomingSignalPaths: incomingSignalPaths,
+          crossProbeService: crossProbeService,
+          extensionClient: extensionClient,
+          expansionMode: expansionMode,
+          initialExpansionMode: initialExpansionMode,
+        );
+
+  /// Creates a viewer backed by a shared hierarchy and optional netlist map.
+  ///
+  /// Without [netlistJsonMap], [SchematicExpansionMode.blocksOnly] and
+  /// [SchematicExpansionMode.fullyExpanded] both expand the complete
+  /// hierarchy because hierarchy-only data has no wires to display.
+  const EmbeddedSchematicViewer.fromHierarchy({
+    required HierarchyService externalHierarchy,
+    Key? key,
+    Map<String, dynamic>? netlistJsonMap,
+    SchematicThemeMode? themeMode,
+    SchematicThemeMode? initialThemeMode,
+    ValueChanged<HierarchyOccurrence?>? onModuleSelected,
+    HierarchyOccurrence? selectedModule,
+    bool isVisible = true,
+    ({String value, bool computed, String signalId})? Function(String wireName)?
+        signalValueLookupFn,
+    Future<Map<String, dynamic>?> Function(String definitionName)?
+        fetchModuleNetlist,
+    ValueChanged<Map<String, dynamic>>? onNetlistEnriched,
+    void Function(List<String> signalPaths)? onSendSignals,
+    bool hasExternalSignalListeners = false,
+    GoToSourceCallback? onGoToSourceCallback,
+    ValueNotifier<List<String>?>? incomingSignalPaths,
+    CrossProbeService? crossProbeService,
+    RohdExtensionClient? extensionClient,
+    SchematicExpansionMode? expansionMode,
+    SchematicExpansionMode initialExpansionMode =
+        SchematicExpansionMode.defaultView,
+  }) : this(
+          key: key,
+          netlistJsonMap: netlistJsonMap,
+          themeMode: themeMode,
+          initialThemeMode: initialThemeMode,
+          externalHierarchy: externalHierarchy,
+          onModuleSelected: onModuleSelected,
+          selectedModule: selectedModule,
+          isVisible: isVisible,
+          signalValueLookupFn: signalValueLookupFn,
+          fetchModuleNetlist: fetchModuleNetlist,
+          onNetlistEnriched: onNetlistEnriched,
+          onSendSignals: onSendSignals,
+          hasExternalSignalListeners: hasExternalSignalListeners,
+          onGoToSourceCallback: onGoToSourceCallback,
+          incomingSignalPaths: incomingSignalPaths,
+          crossProbeService: crossProbeService,
+          extensionClient: extensionClient,
+          expansionMode: expansionMode,
+          initialExpansionMode: initialExpansionMode,
+        );
+
+  /// Creates a viewer that loads schematic JSON from an asset.
+  const EmbeddedSchematicViewer.fromAsset({
+    required String assetPath,
+    Key? key,
+    SchematicThemeMode? themeMode,
+    SchematicThemeMode? initialThemeMode,
+    bool isVisible = true,
+    void Function(List<String> signalPaths)? onSendSignals,
+    bool hasExternalSignalListeners = false,
+    GoToSourceCallback? onGoToSourceCallback,
+    ValueNotifier<List<String>?>? incomingSignalPaths,
+    CrossProbeService? crossProbeService,
+    RohdExtensionClient? extensionClient,
+    SchematicExpansionMode? expansionMode,
+    SchematicExpansionMode initialExpansionMode =
+        SchematicExpansionMode.defaultView,
+  }) : this(
+          key: key,
+          assetPath: assetPath,
+          themeMode: themeMode,
+          initialThemeMode: initialThemeMode,
+          isVisible: isVisible,
+          onSendSignals: onSendSignals,
+          hasExternalSignalListeners: hasExternalSignalListeners,
+          onGoToSourceCallback: onGoToSourceCallback,
+          incomingSignalPaths: incomingSignalPaths,
+          crossProbeService: crossProbeService,
+          extensionClient: extensionClient,
+          expansionMode: expansionMode,
+          initialExpansionMode: initialExpansionMode,
+        );
+
+  SchematicThemeMode? get _effectiveThemeMode => themeMode ?? initialThemeMode;
+
+  SchematicExpansionMode get _effectiveExpansionMode =>
+      expansionMode ?? initialExpansionMode;
 
   @override
   State<EmbeddedSchematicViewer> createState() =>
@@ -203,6 +402,7 @@ class EmbeddedSchematicViewer extends StatefulWidget {
           netlistJsonMap,
         ),
       )
+      ..add(EnumProperty<SchematicThemeMode?>('themeMode', themeMode))
       ..add(
         EnumProperty<SchematicThemeMode?>('initialThemeMode', initialThemeMode),
       )
@@ -279,6 +479,12 @@ class EmbeddedSchematicViewer extends StatefulWidget {
         ),
       )
       ..add(
+        EnumProperty<SchematicExpansionMode?>(
+          'expansionMode',
+          expansionMode,
+        ),
+      )
+      ..add(
         EnumProperty<SchematicExpansionMode>(
           'initialExpansionMode',
           initialExpansionMode,
@@ -341,7 +547,42 @@ class _EmbeddedSchematicViewerState
   // the expanded layout with a single collapsed block.
   bool _initialLoadInProgress = false;
 
-  // Tracks which nodes are user-expanded in light-synthesis mode.
+  // Invalidates older asynchronous initial-layout requests. Parsing and ELK
+  // results are committed only when their generation is still current.
+  int _layoutLoadGeneration = 0;
+
+  int _beginLayoutLoad() {
+    _initialLoadInProgress = false;
+    return ++_layoutLoadGeneration;
+  }
+
+  bool _isCurrentLayoutLoad(int generation) =>
+      mounted && generation == _layoutLoadGeneration;
+
+  void _invalidateLayoutLoads() {
+    _beginLayoutLoad();
+  }
+
+  void _queueSelectedModuleForReload() {
+    _pendingModule = widget.selectedModule;
+    _hasPendingModule = true;
+  }
+
+  void _processPendingModuleSelection() {
+    if (!_hasPendingModule) {
+      return;
+    }
+    debugPrint(
+      '[EmbeddedSchematicViewer] Processing deferred module '
+      'selection after reload: ${_pendingModule?.path()}',
+    );
+    _hasPendingModule = false;
+    final pending = _pendingModule;
+    _pendingModule = null;
+    _selectModule(pending);
+  }
+
+  // Tracks which nodes are expanded in light-synthesis mode.
   // Light synthesis has no schematicAdapter, so expansion state is tracked
   // here and each toggle triggers a full re-synthesis pass.
   // Keyed by the current module scope (null = root view).
@@ -552,7 +793,7 @@ class _EmbeddedSchematicViewerState
   void initState() {
     super.initState();
     _themeCubit = SchematicThemeCubit(
-      widget.initialThemeMode ?? SchematicThemeMode.dark,
+      widget._effectiveThemeMode ?? SchematicThemeMode.dark,
     );
     if (widget.crossProbeService != null) {
       _translatedIncoming = ValueNotifier<List<String>?>(null);
@@ -631,6 +872,15 @@ class _EmbeddedSchematicViewerState
 
   @override
   Future<void> loadInitialSchematic() async {
+    final loadGeneration = _beginLayoutLoad();
+    final expansionMode = widget._effectiveExpansionMode;
+
+    if (widget.externalHierarchy != null &&
+        widget.selectedModule != null &&
+        !_hasPendingModule) {
+      _queueSelectedModuleForReload();
+    }
+
     debugPrint('[EmbeddedSchematicViewer] loadInitialSchematic() called');
     debugPrint('[EmbeddedSchematicViewer]   isVisible: ${widget.isVisible}');
     debugPrint(
@@ -667,7 +917,11 @@ class _EmbeddedSchematicViewerState
     // available, cells also have internal connectivity for routing.
     if (widget.netlistJsonMap != null) {
       debugPrint('[EmbeddedSchematicViewer] Parsing ROHD schematic JSON');
-      await _loadFromJsonMap(widget.netlistJsonMap!);
+      await _loadFromJsonMap(
+        widget.netlistJsonMap!,
+        loadGeneration: loadGeneration,
+        expansionMode: expansionMode,
+      );
       return;
     }
 
@@ -678,30 +932,49 @@ class _EmbeddedSchematicViewerState
         '[EmbeddedSchematicViewer] Loading from external hierarchy '
         '(using light synthesis)',
       );
-      await _synthesizeFromHierarchyLight();
+      await _synthesizeFromHierarchyLight(
+        loadGeneration: loadGeneration,
+        expansionMode: expansionMode,
+      );
       return;
     }
 
     if (widget.schematicJson != null) {
       debugPrint('[EmbeddedSchematicViewer] Loading from provided JSON string');
-      await _loadFromJson(widget.schematicJson!);
+      await _loadFromJson(
+        widget.schematicJson!,
+        loadGeneration: loadGeneration,
+        expansionMode: expansionMode,
+      );
     } else if (widget.assetPath != null) {
       debugPrint(
         '[EmbeddedSchematicViewer] Loading from asset: '
         '${widget.assetPath}',
       );
-      await _loadFromAsset();
+      await _loadFromAsset(
+        loadGeneration: loadGeneration,
+        expansionMode: expansionMode,
+      );
     } else {
       // No hierarchy, JSON, or asset path - wait for hierarchy to be provided
       debugPrint(
         '[EmbeddedSchematicViewer] No initial data - '
         'waiting for hierarchy',
       );
-      setLoading(loading: true);
+      if (_isCurrentLayoutLoad(loadGeneration)) {
+        setLoading(loading: true);
+      }
     }
   }
 
-  Future<void> _loadFromJsonMap(Map<String, dynamic> jsonMap) async {
+  Future<void> _loadFromJsonMap(
+    Map<String, dynamic> jsonMap, {
+    required int loadGeneration,
+    required SchematicExpansionMode expansionMode,
+  }) async {
+    if (!_isCurrentLayoutLoad(loadGeneration)) {
+      return;
+    }
     _initialLoadInProgress = true;
     setLoading(loading: true);
 
@@ -713,8 +986,7 @@ class _EmbeddedSchematicViewerState
         completer.complete();
       });
       await completer.future;
-      if (!mounted) {
-        _initialLoadInProgress = false;
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
         return;
       }
     }
@@ -786,7 +1058,14 @@ class _EmbeddedSchematicViewerState
             '[INCREMENTAL] Fetching full connectivity for root '
             'module "$topKey" before initial layout',
           );
-          await _ensureModuleConnectivity(topKey, modules);
+          await _ensureModuleConnectivity(
+            topKey,
+            modules,
+            shouldContinue: () => _isCurrentLayoutLoad(loadGeneration),
+          );
+          if (!_isCurrentLayoutLoad(loadGeneration)) {
+            return;
+          }
         }
       }
 
@@ -846,7 +1125,14 @@ class _EmbeddedSchematicViewerState
         '[EmbeddedSchematicViewer] _loadFromJsonMap: calling '
         'computeLayout (${jsonString.length} chars)...',
       );
-      await computeLayout(jsonString);
+      await computeLayout(
+        jsonString,
+        expansionMode: expansionMode,
+        shouldCommit: () => _isCurrentLayoutLoad(loadGeneration),
+      );
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
+        return;
+      }
       debugPrint(
         '[EmbeddedSchematicViewer] _loadFromJsonMap: computeLayout '
         'returned, layout=${layout != null}, '
@@ -937,19 +1223,11 @@ class _EmbeddedSchematicViewerState
 
       setLoading(loading: false, errorMessage: error);
       _initialLoadInProgress = false;
-
-      // Process any module selection that was deferred during initial load
-      if (_hasPendingModule) {
-        debugPrint(
-          '[EmbeddedSchematicViewer] Processing deferred module '
-          'selection after initial load: ${_pendingModule?.path()}',
-        );
-        _hasPendingModule = false;
-        final pending = _pendingModule;
-        _pendingModule = null;
-        _selectModule(pending);
-      }
+      _processPendingModuleSelection();
     } on Exception catch (e) {
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
+        return;
+      }
       _initialLoadInProgress = false;
       setLoading(loading: false, errorMessage: 'Failed to compute layout: $e');
     }
@@ -1161,23 +1439,62 @@ class _EmbeddedSchematicViewerState
     }
   }
 
-  Future<void> _loadFromJson(String jsonData) async {
+  Future<void> _loadFromJson(
+    String jsonData, {
+    required int loadGeneration,
+    required SchematicExpansionMode expansionMode,
+  }) async {
+    if (!_isCurrentLayoutLoad(loadGeneration)) {
+      return;
+    }
     setLoading(loading: true);
     try {
-      await computeLayout(jsonData, expansionMode: widget.initialExpansionMode);
+      await computeLayout(
+        jsonData,
+        expansionMode: expansionMode,
+        shouldCommit: () => _isCurrentLayoutLoad(loadGeneration),
+      );
+      if (_isCurrentLayoutLoad(loadGeneration) &&
+          error == null &&
+          layout != null) {
+        _processPendingModuleSelection();
+      }
     } on Exception catch (e) {
-      setLoading(loading: false, errorMessage: 'Failed to compute layout: $e');
+      if (_isCurrentLayoutLoad(loadGeneration)) {
+        setLoading(
+          loading: false,
+          errorMessage: 'Failed to compute layout: $e',
+        );
+      }
     }
   }
 
-  Future<void> _loadFromAsset() async {
+  Future<void> _loadFromAsset({
+    required int loadGeneration,
+    required SchematicExpansionMode expansionMode,
+  }) async {
+    if (!_isCurrentLayoutLoad(loadGeneration)) {
+      return;
+    }
     setLoading(loading: true);
     try {
       final path = widget.assetPath ?? EmbeddedSchematicViewer.defaultAssetPath;
       final jsonData = await rootBundle.loadString(path);
-      await computeLayout(jsonData);
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
+        return;
+      }
+      await computeLayout(
+        jsonData,
+        expansionMode: expansionMode,
+        shouldCommit: () => _isCurrentLayoutLoad(loadGeneration),
+      );
     } on Exception catch (e) {
-      setLoading(loading: false, errorMessage: 'Failed to load schematic: $e');
+      if (_isCurrentLayoutLoad(loadGeneration)) {
+        setLoading(
+          loading: false,
+          errorMessage: 'Failed to load schematic: $e',
+        );
+      }
     }
   }
 
@@ -1216,6 +1533,19 @@ class _EmbeddedSchematicViewerState
       '${widget.schematicJson != null ? 'present' : 'null'}',
     );
 
+    final controlledThemeMode = widget.themeMode;
+    if (controlledThemeMode != null &&
+        controlledThemeMode != oldWidget.themeMode) {
+      debugPrint(
+        '[EmbeddedSchematicViewer] Theme mode changed, updating cubit',
+      );
+      _themeCubit.setTheme(controlledThemeMode);
+    }
+    final expansionModeChanged = widget.expansionMode != null &&
+        widget.expansionMode != oldWidget.expansionMode;
+    final selectedModuleChanged =
+        widget.selectedModule != oldWidget.selectedModule;
+
     // Fast path: if the tab is hidden and none of the structural props
     // changed (hierarchy, netlist, selected module, visibility), skip all
     // processing — the rebuild was likely triggered by an unrelated cubit
@@ -1224,9 +1554,15 @@ class _EmbeddedSchematicViewerState
         !oldWidget.isVisible &&
         identical(widget.externalHierarchy, oldWidget.externalHierarchy) &&
         identical(widget.netlistJsonMap, oldWidget.netlistJsonMap) &&
-        widget.selectedModule == oldWidget.selectedModule &&
-        widget.schematicJson == oldWidget.schematicJson) {
+        !selectedModuleChanged &&
+        widget.schematicJson == oldWidget.schematicJson &&
+        widget.assetPath == oldWidget.assetPath &&
+        !expansionModeChanged) {
       return;
+    }
+
+    if (selectedModuleChanged && widget.externalHierarchy != null) {
+      _queueSelectedModuleForReload();
     }
 
     // IMPORTANT: process visibility transition before any early-return
@@ -1242,14 +1578,22 @@ class _EmbeddedSchematicViewerState
       return;
     }
 
-    // Sync theme cubit if initialThemeMode changed
-    if (widget.initialThemeMode != oldWidget.initialThemeMode &&
-        widget.initialThemeMode != null) {
+    if (expansionModeChanged) {
       debugPrint(
-        '[EmbeddedSchematicViewer] Theme mode changed, '
-        'updating cubit',
+        '[EmbeddedSchematicViewer] Expansion mode changed, reloading layout',
       );
-      _themeCubit.setTheme(widget.initialThemeMode!);
+      _moduleCache.clear();
+      _lightSynthExpandedNodes.clear();
+      if (widget.externalHierarchy != null) {
+        _queueSelectedModuleForReload();
+      }
+      if (!widget.isVisible) {
+        _invalidateLayoutLoads();
+        _initialLoadDeferred = true;
+      } else {
+        unawaited(loadInitialSchematic());
+      }
+      return;
     }
 
     // If netlistJsonMap changed, either refresh caches in-place (incremental
@@ -1285,7 +1629,14 @@ class _EmbeddedSchematicViewerState
             '[EmbeddedSchematicViewer] Schematic JSON map changed '
             '(design swap) — reloading',
           );
-          unawaited(_loadFromJsonMap(widget.netlistJsonMap!));
+          final loadGeneration = _beginLayoutLoad();
+          unawaited(
+            _loadFromJsonMap(
+              widget.netlistJsonMap!,
+              loadGeneration: loadGeneration,
+              expansionMode: widget._effectiveExpansionMode,
+            ),
+          );
           return;
         }
       }
@@ -1307,7 +1658,13 @@ class _EmbeddedSchematicViewerState
           '[EmbeddedSchematicViewer] Schematic JSON removed but '
           'hierarchy available, fetching or light-synthesizing',
         );
-        unawaited(_fetchOrSynthesizeModule());
+        final loadGeneration = _beginLayoutLoad();
+        unawaited(
+          _fetchOrSynthesizeModule(
+            loadGeneration: loadGeneration,
+            targetModuleId: _currentModuleId,
+          ),
+        );
       }
       return;
     }
@@ -1328,7 +1685,13 @@ class _EmbeddedSchematicViewerState
           '[EmbeddedSchematicViewer] Hierarchy changed, '
           'fetching or light-synthesizing',
         );
-        unawaited(_fetchOrSynthesizeModule());
+        final loadGeneration = _beginLayoutLoad();
+        unawaited(
+          _fetchOrSynthesizeModule(
+            loadGeneration: loadGeneration,
+            targetModuleId: _currentModuleId,
+          ),
+        );
       }
     } else if (widget.externalHierarchy != oldWidget.externalHierarchy) {
       debugPrint(
@@ -1348,12 +1711,13 @@ class _EmbeddedSchematicViewerState
     // Handle selected module changes from parent
     // When a submodule is selected, synthesize its schematic from hierarchy
     // This works even when netlistJsonMap is provided (ROHD format)
-    if (widget.selectedModule != oldWidget.selectedModule &&
-        widget.externalHierarchy != null) {
+    if (selectedModuleChanged && widget.externalHierarchy != null) {
       if (widget.isVisible && !_initialLoadInProgress) {
         debugPrint(
           '[EmbeddedSchematicViewer] Selected module changed, updating',
         );
+        _hasPendingModule = false;
+        _pendingModule = null;
         _selectModule(widget.selectedModule);
       } else {
         // Defer expensive layout computation until the tab is visible
@@ -1370,8 +1734,6 @@ class _EmbeddedSchematicViewerState
           '$loadState, '
           'deferring',
         );
-        _pendingModule = widget.selectedModule;
-        _hasPendingModule = true;
       }
     }
 
@@ -1405,11 +1767,55 @@ class _EmbeddedSchematicViewerState
       }
     }
 
-    // Reload if the JSON changed
+    // Reload if the JSON or asset source changed.
     if (widget.schematicJson != oldWidget.schematicJson &&
         widget.schematicJson != null) {
       debugPrint('[EmbeddedSchematicViewer] Schematic JSON changed, reloading');
-      unawaited(_loadFromJson(widget.schematicJson!));
+      final loadGeneration = _beginLayoutLoad();
+      unawaited(
+        _loadFromJson(
+          widget.schematicJson!,
+          loadGeneration: loadGeneration,
+          expansionMode: widget._effectiveExpansionMode,
+        ),
+      );
+    } else if (widget.assetPath != oldWidget.assetPath &&
+        widget.assetPath != null) {
+      debugPrint(
+        '[EmbeddedSchematicViewer] Asset path changed, reloading: '
+        '${widget.assetPath}',
+      );
+      unawaited(loadInitialSchematic());
+    }
+  }
+
+  /// Builds the initial light-synthesis expansion set for [mode].
+  static Set<String> _initialLightSynthesisExpansion(
+    HierarchyOccurrence targetNode,
+    SchematicExpansionMode mode,
+  ) {
+    final expandedNodes = <String>{};
+
+    void expandHierarchy(HierarchyOccurrence node) {
+      if (node.children.isEmpty) {
+        return;
+      }
+      expandedNodes.add(node.path());
+      node.children.forEach(expandHierarchy);
+    }
+
+    switch (mode) {
+      case SchematicExpansionMode.collapsed:
+        return expandedNodes;
+      case SchematicExpansionMode.defaultView:
+        expandedNodes.add(targetNode.path());
+        return expandedNodes;
+      case SchematicExpansionMode.blocksOnly:
+        expandHierarchy(targetNode);
+        return expandedNodes;
+      case SchematicExpansionMode.fullyExpanded:
+        expandHierarchy(targetNode);
+        return expandedNodes;
     }
   }
 
@@ -1420,7 +1826,16 @@ class _EmbeddedSchematicViewerState
   /// full JS-based synthesis and works well for initial visualization.
   Future<void> _synthesizeFromHierarchyLight({
     Set<String>? expandedNodesOverride,
+    int? loadGeneration,
+    SchematicExpansionMode? expansionMode,
+    String? moduleId,
   }) async {
+    bool requestIsCurrent() =>
+        loadGeneration == null || _isCurrentLayoutLoad(loadGeneration);
+
+    if (!requestIsCurrent()) {
+      return;
+    }
     if (widget.externalHierarchy == null) {
       debugPrint(
         '[EmbeddedSchematicViewer] externalHierarchy is null, '
@@ -1442,43 +1857,40 @@ class _EmbeddedSchematicViewerState
       );
 
       // Get the target node (root or selected module)
-      final targetNode = _currentModuleId != null
-          ? _resolveNode(widget.externalHierarchy!, _currentModuleId!)
+      final targetModuleId = moduleId ?? _currentModuleId;
+      final targetNode = targetModuleId != null
+          ? _resolveNode(widget.externalHierarchy!, targetModuleId)
           : widget.externalHierarchy!.root;
 
-      // Determine which nodes to show expanded.
-      // If an override is provided (from a user toggle), use it directly.
-      // On the first call for a scope, auto-expand immediate children so the
-      // user immediately sees the next level without having to click.
+      // Determine which nodes to show expanded. User toggles and restored
+      // scope state take precedence over the configured initial mode.
       late final Set<String> expandedNodes;
       if (expandedNodesOverride != null) {
         expandedNodes = expandedNodesOverride;
         // Persist so subsequent toggles start from the current state.
-        _lightSynthExpandedNodes[_currentModuleId] = Set<String>.from(
+        _lightSynthExpandedNodes[targetModuleId] = Set<String>.from(
           expandedNodes,
         );
-      } else if (_lightSynthExpandedNodes.containsKey(_currentModuleId)) {
+      } else if (_lightSynthExpandedNodes.containsKey(targetModuleId)) {
         // Re-entering this scope (e.g. cache miss after navigation) —
         // restore the previously-persisted expansion state.
         expandedNodes = Set<String>.from(
-          _lightSynthExpandedNodes[_currentModuleId]!,
+          _lightSynthExpandedNodes[targetModuleId]!,
         );
       } else {
-        // First visit: auto-expand immediate children.
-        expandedNodes = <String>{};
-        if (targetNode != null && targetNode.children.isNotEmpty) {
-          for (final child in targetNode.children) {
-            expandedNodes.add(child.path());
-          }
-        }
-        // Persist the auto-expanded state for this scope.
-        _lightSynthExpandedNodes[_currentModuleId] = Set<String>.from(
+        expandedNodes = targetNode == null
+            ? <String>{}
+            : _initialLightSynthesisExpansion(
+                targetNode,
+                expansionMode ?? widget._effectiveExpansionMode,
+              );
+        _lightSynthExpandedNodes[targetModuleId] = Set<String>.from(
           expandedNodes,
         );
         if (expandedNodes.isNotEmpty) {
           debugPrint(
             '[EmbeddedSchematicViewer] Expanding ${expandedNodes.length} '
-            'child modules in schematic',
+            'hierarchy nodes in schematic',
           );
         }
       }
@@ -1489,9 +1901,14 @@ class _EmbeddedSchematicViewerState
         'from hierarchy...',
       );
       final layout = synthesizer.synthesize(
-        moduleId: _currentModuleId,
+        moduleId: targetModuleId,
         expandedNodes: expandedNodes,
+        expandRoot:
+            targetNode != null && expandedNodes.contains(targetNode.path()),
       );
+      if (!requestIsCurrent()) {
+        return;
+      }
 
       debugPrint(
         '[EmbeddedSchematicViewer] Light layout generated: '
@@ -1502,7 +1919,7 @@ class _EmbeddedSchematicViewerState
       );
 
       // Cache the generated layout
-      final cacheKey = _currentModuleId ?? 'root';
+      final cacheKey = targetModuleId ?? 'root';
       if (layout.instances.isNotEmpty) {
         _moduleCache[cacheKey] = _CachedModule(
           layout,
@@ -1520,7 +1937,7 @@ class _EmbeddedSchematicViewerState
       }
 
       // Display the layout by triggering a rebuild
-      if (!mounted) {
+      if (!requestIsCurrent()) {
         return;
       }
       setState(() {
@@ -1530,7 +1947,11 @@ class _EmbeddedSchematicViewerState
         error = null;
         isLoading = false;
       });
+      _processPendingModuleSelection();
     } on Exception catch (e, stackTrace) {
+      if (!requestIsCurrent()) {
+        return;
+      }
       debugPrint('[EmbeddedSchematicViewer] Error in light synthesis: $e');
       debugPrint('[EmbeddedSchematicViewer] Stack trace: $stackTrace');
       setLoading(
@@ -1572,9 +1993,8 @@ class _EmbeddedSchematicViewerState
     await frameCompleter.future;
 
     try {
-      // Get the persisted expanded set for the current scope (initialised to
-      // auto-expand of immediate children on first visit by
-      // _synthesizeFromHierarchyLight), then toggle the clicked node.
+      // Get the persisted expanded set for the current scope, then toggle the
+      // clicked node.
       final currentExpanded =
           _lightSynthExpandedNodes[_currentModuleId] ?? <String>{};
       final newExpanded = Set<String>.from(currentExpanded);
@@ -1691,7 +2111,15 @@ class _EmbeddedSchematicViewerState
   /// `HierarchyToNetlistConverter` to fabricate lossy JSON from the
   /// hierarchy tree. The server always has the real netlist (slim or full)
   /// which renders correctly in either case.
-  Future<void> _fetchOrSynthesizeModule() async {
+  Future<void> _fetchOrSynthesizeModule({
+    required int loadGeneration,
+    required String? targetModuleId,
+  }) async {
+    bool requestIsCurrent() => _isCurrentLayoutLoad(loadGeneration);
+
+    if (!requestIsCurrent()) {
+      return;
+    }
     if (widget.externalHierarchy == null) {
       debugPrint(
         '[EmbeddedSchematicViewer] externalHierarchy is null, '
@@ -1702,8 +2130,8 @@ class _EmbeddedSchematicViewerState
 
     // Determine the definition (type) name for the current module.
     final HierarchyOccurrence targetNode;
-    if (_currentModuleId != null) {
-      targetNode = _resolveNode(widget.externalHierarchy!, _currentModuleId!) ??
+    if (targetModuleId != null) {
+      targetNode = _resolveNode(widget.externalHierarchy!, targetModuleId) ??
           widget.externalHierarchy!.root;
     } else {
       targetNode = widget.externalHierarchy!.root;
@@ -1720,6 +2148,9 @@ class _EmbeddedSchematicViewerState
       );
       try {
         final fullData = await widget.fetchModuleNetlist!(definitionName);
+        if (!requestIsCurrent()) {
+          return;
+        }
         if (fullData != null && fullData.isNotEmpty) {
           debugPrint(
             '[EmbeddedSchematicViewer] Server returned netlist for '
@@ -1746,7 +2177,12 @@ class _EmbeddedSchematicViewerState
             }
           }
 
-          await _extractAndComputeFromJson(definitionName, modules);
+          await _extractAndComputeFromJson(
+            definitionName,
+            modules,
+            loadGeneration: loadGeneration,
+            targetModuleId: targetModuleId,
+          );
           return;
         }
         debugPrint(
@@ -1754,6 +2190,9 @@ class _EmbeddedSchematicViewerState
           '"$definitionName", falling back to light synthesis',
         );
       } on Exception catch (e) {
+        if (!requestIsCurrent()) {
+          return;
+        }
         debugPrint(
           '[EmbeddedSchematicViewer] Fetch failed for '
           '"$definitionName": $e — falling back to light synthesis',
@@ -1767,7 +2206,10 @@ class _EmbeddedSchematicViewerState
     }
 
     // Fallback: light synthesis (grid layout from hierarchy, no edges).
-    await _synthesizeFromHierarchyLight();
+    await _synthesizeFromHierarchyLight(
+      loadGeneration: loadGeneration,
+      moduleId: targetModuleId,
+    );
   }
 
   /// Select a module from the parent's selection.
@@ -1776,10 +2218,12 @@ class _EmbeddedSchematicViewerState
   /// 2. Check netlistJsonMap (by module key) - compute and cache layout
   /// 3. Fetch real netlist from server, or light-synthesize
   void _selectModule(HierarchyOccurrence? module) {
+    final loadGeneration = _beginLayoutLoad();
     if (module == null) {
       _currentModuleId = null;
       return;
     }
+    final targetModuleId = module.path();
 
     // Resolve the module key for this instance.
     // Hierarchy uses instance paths (e.g., 'dut') but the netlist JSON and
@@ -1815,20 +2259,23 @@ class _EmbeddedSchematicViewerState
     _saveCurrentExpansionState();
 
     // NOW switch to the new module
-    _currentModuleId = module.path();
+    _currentModuleId = targetModuleId;
 
     // Replay any incoming signals that were buffered while
     // _currentModuleId was null (cross-probe arrived before load).
     _replayPendingIncomingSignals();
 
     // Check 1: Try cache by instance ID (unique per instance)
-    if (_moduleCache.containsKey(module.path())) {
+    if (_moduleCache.containsKey(targetModuleId)) {
       if (_cachingEnabled) {
         debugPrint(
           '[EmbeddedSchematicViewer] Cache hit by instance ID: '
-          '${module.path()}',
+          '$targetModuleId',
         );
-        _restoreFromCache(_moduleCache[module.path()]!);
+        _restoreFromCache(
+          _moduleCache[targetModuleId]!,
+          loadGeneration: loadGeneration,
+        );
         return;
       } else {
         debugPrint(
@@ -1861,8 +2308,8 @@ class _EmbeddedSchematicViewerState
           template.jsonString,
           template.expansionSnapshot,
         );
-        _moduleCache[module.path()] = instanceCopy;
-        _restoreFromCache(instanceCopy);
+        _moduleCache[targetModuleId] = instanceCopy;
+        _restoreFromCache(instanceCopy, loadGeneration: loadGeneration);
         return;
       } else {
         debugPrint(
@@ -1890,10 +2337,16 @@ class _EmbeddedSchematicViewerState
           debugPrint(
             '[EmbeddedSchematicViewer] *** _selectModule taking '
             '_extractAndComputeFromJson path for: $lookupKey '
-            '(instance: ${module.path()}). This will call computeLayout '
-            'and may OVERWRITE the current expanded layout! ***',
+            '(instance: ${module.path()}). ***',
           );
-          unawaited(_extractAndComputeFromJson(lookupKey, modules));
+          unawaited(
+            _extractAndComputeFromJson(
+              lookupKey,
+              modules,
+              loadGeneration: loadGeneration,
+              targetModuleId: targetModuleId,
+            ),
+          );
           return;
         }
       }
@@ -1905,7 +2358,12 @@ class _EmbeddedSchematicViewerState
         '[EmbeddedSchematicViewer] Module not in cache or JSON, '
         'fetching or light-synthesizing: ${module.path()}',
       );
-      unawaited(_fetchOrSynthesizeModule());
+      unawaited(
+        _fetchOrSynthesizeModule(
+          loadGeneration: loadGeneration,
+          targetModuleId: targetModuleId,
+        ),
+      );
     } else {
       debugPrint(
         '[EmbeddedSchematicViewer] Module ${module.path()} not cached, '
@@ -1960,7 +2418,13 @@ class _EmbeddedSchematicViewerState
 
   /// Restore from cache: show the cached layout instantly, then rebuild
   /// the adapter from cached JSON and replay the saved expansion state.
-  void _restoreFromCache(_CachedModule cached) {
+  void _restoreFromCache(
+    _CachedModule cached, {
+    required int loadGeneration,
+  }) {
+    if (!_isCurrentLayoutLoad(loadGeneration)) {
+      return;
+    }
     try {
       // Check if this is a light synthesis result (empty jsonString)
       final isLightSynthesis = cached.jsonString.isEmpty;
@@ -2046,7 +2510,7 @@ class _EmbeddedSchematicViewerState
         unconnectedPortIds: cached.layout.unconnectedPortIds,
         interiorUnconnectedPortIds: cached.layout.interiorUnconnectedPortIds,
       );
-      if (!mounted) {
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
         return;
       }
 
@@ -2067,9 +2531,18 @@ class _EmbeddedSchematicViewerState
         isLoading = false;
       });
     } on Exception catch (e) {
+      if (!_isCurrentLayoutLoad(loadGeneration)) {
+        return;
+      }
       debugPrint('[EmbeddedSchematicViewer] Cache restore failed: $e');
       // Fall back to full recomputation
-      unawaited(computeLayout(cached.jsonString));
+      unawaited(
+        computeLayout(
+          cached.jsonString,
+          expansionMode: widget._effectiveExpansionMode,
+          shouldCommit: () => _isCurrentLayoutLoad(loadGeneration),
+        ),
+      );
     }
   }
 
@@ -2079,8 +2552,15 @@ class _EmbeddedSchematicViewerState
   /// children remain expandable.
   Future<void> _extractAndComputeFromJson(
     String moduleId,
-    Map<String, dynamic> modules,
-  ) async {
+    Map<String, dynamic> modules, {
+    required int loadGeneration,
+    required String? targetModuleId,
+  }) async {
+    bool requestIsCurrent() => _isCurrentLayoutLoad(loadGeneration);
+
+    if (!requestIsCurrent()) {
+      return;
+    }
     setLoading(loading: true);
     try {
       // ── Incremental fetch: ensure the target module has connectivity ──
@@ -2091,7 +2571,14 @@ class _EmbeddedSchematicViewerState
         '[INCREMENTAL] _extractAndComputeFromJson: '
         'preparing module "$moduleId" for layout',
       );
-      await _ensureModuleConnectivity(moduleId, modules);
+      await _ensureModuleConnectivity(
+        moduleId,
+        modules,
+        shouldContinue: requestIsCurrent,
+      );
+      if (!requestIsCurrent()) {
+        return;
+      }
 
       // Collect all transitively needed module keys via BFS, then
       // build neededModules by reading from `modules` at encode time.
@@ -2169,7 +2656,14 @@ class _EmbeddedSchematicViewerState
 
       final subJsonString = jsonEncode(submoduleJson);
 
-      await computeLayout(subJsonString);
+      await computeLayout(
+        subJsonString,
+        expansionMode: widget._effectiveExpansionMode,
+        shouldCommit: requestIsCurrent,
+      );
+      if (!requestIsCurrent()) {
+        return;
+      }
 
       // Cache the result by instance ID (unique per instance).
       // Also cache by module key as a template for same-type
@@ -2185,8 +2679,8 @@ class _EmbeddedSchematicViewerState
                     ({Set<String> childIds, Set<String> edgeIds})>{},
               ),
         );
-        if (_currentModuleId != null) {
-          _moduleCache[_currentModuleId!] = entry;
+        if (targetModuleId != null) {
+          _moduleCache[targetModuleId] = entry;
         }
         // Also store as type template if not yet present
         if (!_moduleCache.containsKey(moduleId)) {
@@ -2196,7 +2690,7 @@ class _EmbeddedSchematicViewerState
 
       debugPrint(
         '[EmbeddedSchematicViewer] Computed and cached layout for: '
-        '$moduleId (instance: $_currentModuleId, '
+        '$moduleId (instance: $targetModuleId, '
         'cache size: ${_moduleCache.length})',
       );
       // Invalidate the address mapping: computeLayout replaced schematicJson
@@ -2207,6 +2701,9 @@ class _EmbeddedSchematicViewerState
       _nodeAddrToModuleKey = null;
       setLoading(loading: false);
     } on Exception catch (e, stackTrace) {
+      if (!requestIsCurrent()) {
+        return;
+      }
       debugPrint('[EmbeddedSchematicViewer] Error computing layout: $e');
       debugPrint('[EmbeddedSchematicViewer] Stack trace: $stackTrace');
       setLoading(loading: false, errorMessage: 'Failed to compute layout: $e');
@@ -2219,8 +2716,14 @@ class _EmbeddedSchematicViewerState
   /// connectivity for the parent's schematic layout.
   Future<void> _ensureModuleConnectivity(
     String moduleId,
-    Map<String, dynamic> modules,
-  ) async {
+    Map<String, dynamic> modules, {
+    bool Function()? shouldContinue,
+  }) async {
+    bool requestIsCurrent() => shouldContinue == null || shouldContinue();
+
+    if (!requestIsCurrent()) {
+      return;
+    }
     if (widget.fetchModuleNetlist == null) {
       debugPrint(
         '[INCREMENTAL] _ensureModuleConnectivity: '
@@ -2244,6 +2747,9 @@ class _EmbeddedSchematicViewerState
 
     final fullData = await widget.fetchModuleNetlist!(moduleId);
     stopwatch.stop();
+    if (!requestIsCurrent()) {
+      return;
+    }
 
     if (fullData != null && fullData.containsKey(moduleId)) {
       final moduleBytes = jsonEncode(fullData[moduleId]).length;

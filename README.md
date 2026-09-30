@@ -3,8 +3,8 @@
 [![Tests](https://github.com/intel/rohd-schematic-viewer/actions/workflows/general.yml/badge.svg?event=push)](https://github.com/intel/rohd-schematic-viewer/actions/workflows/general.yml)
 [![API Docs](https://img.shields.io/badge/API%20Docs-generated-success)](https://intel.github.io/rohd-schematic-viewer/api/)
 [![Chat](https://img.shields.io/discord/1001179329411166267?label=Chat)](https://discord.gg/jubxF84yGw)
-[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/rohd-schematic-viewer/blob/main/LICENSE)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/intel/rohd-schematic-viewer/blob/main/CODE_OF_CONDUCT.md)
+[![License](https://img.shields.io/badge/License-BSD--3-blue)](LICENSE)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![Coverage](https://raw.githubusercontent.com/intel/rohd-schematic-viewer/refs/heads/badges/coverage/main.svg)](https://github.com/intel/rohd-schematic-viewer/blob/main/.github/workflows/coverage.yml)
 
 ROHD Schematic Viewer is an interactive viewer for netlists produced by the
@@ -36,6 +36,50 @@ Publishing checklist for https://github.com/intel/rohd-schematic-viewer:
 
    Inline advice:  place in an issue and use that link.
 -->
+
+## Embed the Viewer in a Flutter Application
+
+Import the package library and place [EmbeddedSchematicViewer] in the host
+application's widget tree:
+
+```dart
+import 'package:rohd_schematic_viewer/schematic_viewer.dart';
+
+EmbeddedSchematicViewer.fromJson(
+  schematicJson: netlistJson,
+  themeMode: SchematicThemeMode.dark,
+  expansionMode: SchematicExpansionMode.defaultView,
+)
+```
+
+On Flutter web, the viewer loads its declared package-owned ELK assets on the
+first layout request. Host applications do not need to copy scripts or modify
+their `web/index.html`.
+
+`themeMode` and `expansionMode` are controlled properties: updates from the
+host application are applied without replacing the widget. The
+`initialThemeMode` and `initialExpansionMode` parameters remain available for
+backward-compatible uncontrolled embeddings.
+
+Use `EmbeddedSchematicViewer.fromJson`, `.fromNetlistMap`, `.fromHierarchy`,
+or `.fromAsset` to make the viewer's input mode explicit. The original
+constructor remains temporarily available as a deprecated compatibility path.
+
+The main `schematic_viewer.dart` library exposes only the embeddable widget,
+its configuration enums, and reusable icon and help widgets. Import shared
+hierarchy, cross-probing, and source-navigation contracts from their owning
+packages. Optional schematic APIs use separate entry points:
+
+- `schematic_host.dart` for standalone and extension host pages;
+- `schematic_layout.dart` for custom layout engines and immutable layout data;
+- `schematic_connectivity.dart` for read-only netlist connectivity traversal.
+
+Rendering, canvas state, painters, BLoCs, and concrete layout implementations
+are internal and are not supported package APIs.
+
+The JSON must use the Yosys-compatible netlist structure described below.
+See the complete runnable [widget example](example/main.dart) for a minimal
+application and netlist.
 
 ## Generate a Netlist Directly with ROHD
 

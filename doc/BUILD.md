@@ -6,22 +6,15 @@ This document is the source of truth for building, running, packaging, and switc
 
 - Flutter SDK compatible with `environment.sdk` in `pubspec.yaml`.
 - `bash`, `make`, `git`, and `node` on `PATH`.
-- Linux desktop builds also need CMake, Ninja, `pkg-config`, GTK development
-  files, and a C++ compiler. On Ubuntu/Debian:
+- Linux desktop builds also need CMake, Ninja, `pkg-config`, GTK development files, and a C++ compiler. On Ubuntu/Debian:
 
 ```bash
 sudo apt-get install cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
 ```
 
-Clang is Flutter's preferred Linux compiler. When `clang` and `clang++` are not
-available but `gcc` and `g++` are, the Make targets automatically provide the
-compiler command names Flutter expects and build with GCC instead. This avoids
-installing Clang solely to satisfy Flutter's name-based toolchain check.
+Clang is Flutter's preferred Linux compiler. When `clang` and `clang++` are not available but `gcc` and `g++` are, the Make targets automatically provide the compiler command names Flutter expects and build with GCC instead. This avoids installing Clang solely to satisfy Flutter's name-based toolchain check.
 
-The Linux build uses CMake and `pkg-config`, and
-[linux/CMakeLists.txt](../linux/CMakeLists.txt) requires `gtk+-3.0`.
-`scripts/stage_linux_assets.sh` validates bundled assets for Linux builds; it
-does not install system dependencies.
+The Linux build uses CMake and `pkg-config`, and [linux/CMakeLists.txt](../linux/CMakeLists.txt) requires `gtk+-3.0`. `scripts/stage_linux_assets.sh` validates bundled assets for Linux builds; it does not install system dependencies.
 
 Check your local Flutter installation with:
 
@@ -31,18 +24,25 @@ flutter doctor
 
 ## Dependency Modes
 
-The repository builds from the `fix/devtools-popup-menu-material-ui` branch of
-`https://github.com/desmonddak/rohd.git` by default. Local ROHD checkouts are
-opt-in.
+By default, the repository uses the hosted dependencies declared in
+`pubspec.yaml`. Git and local overrides are opt-in. Git selection defaults to
+`github.com/intel/rohd:main`, while the default local checkout is
+`~/release/rohd`. Dependency groups retain independent `hosted`/`git`/`local`
+selections, but all Git-backed groups share one repository and ref, and all
+Local-backed groups share one checkout root. Changing a shared setting updates
+every group currently using that source.
 
-VS Code tasks and `scripts/schematic_run.sh` use these dependency modes:
+The command-line script still supports these convenience modes:
 
 | Mode | Meaning |
 | --- | --- |
 | `manifest` | Use the dependency sources in `pubspec.yaml` |
-| `local-rohd` | Local ROHD and hierarchy; Git DevTools-extension packages |
-| `local-extension` | Pub.dev ROHD; local hierarchy and DevTools-extension packages |
+| `local-rohd` | Local ROHD and hierarchy; hosted extension packages |
+| `local-extension` | Hosted ROHD; local hierarchy and extension packages |
 | `local-all` | Local ROHD, hierarchy, and DevTools-extension packages |
+
+Each convenience mode also replaces the persisted group-source state, so a
+later configuration task preserves the mode that was actually installed.
 
 The default local checkout is `~/release/rohd`. Configure all ROHD package
 sources from it with:
@@ -71,19 +71,20 @@ bash scripts/schematic_dev_mode.sh show
 
 ## VS Code Tasks
 
-The checked-in tasks cover dependency switching and common run modes:
+Use the central source selection in each task:
 
-- `Use Manifest Dependencies`
-- `Use Local ROHD Dependencies`
-- `Use Local ROHD Extension Dependencies`
-- `Use All Local ROHD Dependencies`
-- `ROHD Schematic Viewer: Web Debug (choose dependency mode)`
-- `ROHD Schematic Viewer: Web Release (choose dependency mode)`
-- `ROHD Schematic Viewer: Linux Debug (choose dependency mode)`
-- `ROHD Schematic Viewer: Linux Release (choose dependency mode)`
-- `Show Schematic Viewer Dependency Mode`
+- `Configure ROHD Dependency`
+- `Configure Package Dependency`
+- `Configure Widget Dependency`
+- `Configure All Dependencies`
 
-The run tasks default to hosted dependencies and display expanded mode names in the picker.
+Hosted completes immediately after the source selection. Git opens a terminal
+prompt for the shared repository/ref, prefilled with the current setting or
+`github.com/intel/rohd:main`; enter the repository and branch/tag together as
+`repository:ref`. Local opens a terminal prompt for the shared checkout root,
+prefilled with the current path or `~/release/rohd`. Changing either setting
+rewrites every override currently using that source while preserving each
+group's source selection. The run tasks use the resulting configuration.
 
 ## Make Targets
 
@@ -109,7 +110,7 @@ Common targets:
 | `make install-local` | Install the extension zip into local VS Code |
 | `make install-remote` / `make install` | Install the extension zip into VS Code Server |
 | `make clean` | Remove extension, web, and Linux build artifacts |
-| `make real-clean` | Run `make clean`, `flutter clean`, and remove staged generated assets |
+| `make real-clean` | Run `make clean`, `flutter clean`, remove Node dependencies, dependency-source task state, and staged generated assets |
 
 Use `make help` for the current target list.
 

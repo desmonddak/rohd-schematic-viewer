@@ -9,6 +9,7 @@ node_modules/
 pubspec.lock
 pubspec_overrides.yaml
 pubspec_overrides.yaml.disabled*
+.schematic_dependency_sources
 
 # Directory created by dartdoc
 doc/api
@@ -21,6 +22,7 @@ linux/flutter/generated_plugin_registrant.h
 linux/flutter/generated_plugins.cmake
 
 # Generated and ephemeral files
+assets/elk_layout_only.js
 .flutter-plugins
 .flutter-plugins-dependencies
 .fvm/

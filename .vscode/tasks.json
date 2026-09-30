@@ -1,10 +1,82 @@
 {
     "version": "2.0.0",
     "tasks": [
-        {"label": "Use Manifest Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh manifest && flutter pub get", "problemMatcher": []},
-        {"label": "Use Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-rohd && flutter pub get", "problemMatcher": []},
-        {"label": "Use Local ROHD Extension Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-extension && flutter pub get", "problemMatcher": []},
-        {"label": "Use All Local ROHD Dependencies", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh local-all && flutter pub get", "problemMatcher": []},
+        {
+            "label": "Configure ROHD Dependency",
+            "type": "shell",
+            "command": "bash scripts/schematic_dev_mode.sh configure-group rohd ${input:rohdSource} && flutter pub get",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "SCHEMATIC_PROMPT_SOURCE_VALUE": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": [],
+            "detail": "Select hosted, Git, or local for rohd. Git repository/ref and local root are shared settings."
+        },
+        {
+            "label": "Configure Package Dependency",
+            "type": "shell",
+            "command": "bash scripts/schematic_dev_mode.sh configure-group package ${input:packageSource} && flutter pub get",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "SCHEMATIC_PROMPT_SOURCE_VALUE": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": [],
+            "detail": "Select a source for rohd_hierarchy and rohd_source_navigator. Git repository/ref and local root are shared settings."
+        },
+        {
+            "label": "Configure Widget Dependency",
+            "type": "shell",
+            "command": "bash scripts/schematic_dev_mode.sh configure-group widget ${input:widgetSource} && flutter pub get",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "SCHEMATIC_PROMPT_SOURCE_VALUE": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": [],
+            "detail": "Select a source for all three companion packages. Git repository/ref and local root are shared settings."
+        },
+        {
+            "label": "Configure All Dependencies",
+            "type": "shell",
+            "command": "bash scripts/schematic_dev_mode.sh configure-group all ${input:allDependencySource} && flutter pub get",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "SCHEMATIC_PROMPT_SOURCE_VALUE": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": [],
+            "detail": "Select a source for every ROHD dependency. Git repository/ref and local root are shared settings."
+        },
         {
             "label": "ROHD Schematic Viewer: Web Debug",
             "type": "shell",
@@ -36,7 +108,36 @@
             "isBackground": true,
             "problemMatcher": {"pattern": {"regexp": "^$"}, "background": {"activeOnStart": true, "beginsPattern": "^Running Flutter", "endsPattern": "^Application finished"}},
             "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+        }
+    ],
+    "inputs": [
+        {
+            "id": "rohdSource",
+            "type": "pickString",
+            "description": "Source for rohd",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
         },
-        {"label": "Show Schematic Viewer Dependency Mode", "type": "shell", "command": "bash scripts/schematic_dev_mode.sh show", "problemMatcher": []}
+        {
+            "id": "packageSource",
+            "type": "pickString",
+            "description": "Source for rohd_hierarchy and rohd_source_navigator",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        },
+        {
+            "id": "widgetSource",
+            "type": "pickString",
+            "description": "Source for rohd_hierarchy, rohd_devtools_widgets, and rohd_source_navigator",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        },
+        {
+            "id": "allDependencySource",
+            "type": "pickString",
+            "description": "Source for every ROHD-related dependency",
+            "options": ["hosted", "git", "local"],
+            "default": "hosted"
+        }
     ]
 }
