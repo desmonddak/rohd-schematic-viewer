@@ -297,7 +297,6 @@ const _maxPngExportPixels = 16 * 1024 * 1024;
 /// canvas. Reducing the pixel ratio changes only output resolution, not the
 /// schematic region captured: a fit-to-canvas view exports the entire
 /// schematic, while a zoomed view exports exactly the visible region.
-@visibleForTesting
 double pngExportPixelRatioForViewport(Size viewportSize) {
   if (viewportSize.isEmpty ||
       !viewportSize.width.isFinite ||
@@ -310,9 +309,9 @@ double pngExportPixelRatioForViewport(Size viewportSize) {
     viewportSize.height,
   );
   final dimensionRatio = _maxPngExportDimension / maximumDimension;
-  final areaRatio = math.sqrt(
-    _maxPngExportPixels / (viewportSize.width * viewportSize.height),
-  );
+  final areaRatio = math.sqrt(_maxPngExportPixels) /
+      math.sqrt(viewportSize.width) /
+      math.sqrt(viewportSize.height);
   return math.min(
     _preferredPngExportPixelRatio,
     math.min(dimensionRatio, areaRatio),

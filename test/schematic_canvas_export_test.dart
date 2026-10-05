@@ -39,4 +39,12 @@ void main() {
     expect(pixelRatio, lessThan(1));
     expect(viewportSize.width * pixelRatio, lessThanOrEqualTo(4096));
   });
+
+  test('keeps a positive scale for finite extreme viewport sizes', () {
+    const viewportSize = Size(double.maxFinite, double.maxFinite);
+    final pixelRatio = pngExportPixelRatioForViewport(viewportSize);
+
+    expect(pixelRatio.isFinite, isTrue);
+    expect(pixelRatio, greaterThan(0));
+  });
 }
