@@ -1,4 +1,15 @@
 
+## 0.2.1
+
+### Added
+
+- Added an App Bar settings menu with a **Display widths** control for showing or hiding blue multi-bit signal-width overlays without recomputing the schematic layout.
+
+### Fixed
+
+- Prevented large PNG exports from clipping the visible schematic by reducing output raster resolution as needed while preserving the complete current
+  viewport.
+
 ## 0.2.0
 
 ### Added
