@@ -9,7 +9,6 @@
 
 // Compatibility constructor intentionally delegates to the preferred APIs.
 // ignore_for_file: deprecated_member_use_from_same_package
-// ignore_for_file: remove_deprecations_in_breaking_versions
 
 import 'dart:async' show Completer, unawaited;
 import 'dart:convert' show jsonDecode, jsonEncode;
