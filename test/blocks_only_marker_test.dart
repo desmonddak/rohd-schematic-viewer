@@ -275,6 +275,67 @@ void main() {
       expect(result.exteriorHiddenPortIds, contains('portP_out'));
     });
 
+    test(
+      'active ELK projection omits hidden state and preserves marker behavior',
+      () {
+        final graph = _buildBlocksOnlyGraph()
+          ..expandNonPrimitives('root', includeEdges: false);
+        final fullJson = graph.toJsGraph();
+        final activeJson = graph.toActiveJsGraph();
+        final full = jsonDecode(fullJson) as Map<String, dynamic>;
+        final active = jsonDecode(activeJson) as Map<String, dynamic>;
+
+        void expectNoRecursiveHiddenState(Map<String, dynamic> node) {
+          expect(node.containsKey('_children'), isFalse);
+          expect(node.containsKey('_edges'), isFalse);
+          for (final child in node['children'] as List? ?? const []) {
+            if (child is Map<String, dynamic>) {
+              expectNoRecursiveHiddenState(child);
+            }
+          }
+        }
+
+        expect(activeJson.length, lessThan(fullJson.length));
+        expectNoRecursiveHiddenState(active);
+        expect(
+          (active['hwMeta']
+              as Map<String, dynamic>)[ElkLayoutMetadata.hasHiddenChildren],
+          isTrue,
+        );
+        expect(
+          (active['hwMeta']
+              as Map<String, dynamic>)[ElkLayoutMetadata.hasHiddenEdges],
+          isTrue,
+        );
+
+        _addDummyLayout(full);
+        _addDummyLayout(active);
+        final fullResult = ElkLayoutExtractor.extract(full);
+        final activeResult = ElkLayoutExtractor.extract(active);
+
+        expect(
+          activeResult.instances.map((instance) => instance.id),
+          orderedEquals(fullResult.instances.map((instance) => instance.id)),
+        );
+        expect(
+          activeResult.exteriorHiddenPortIds,
+          equals(fullResult.exteriorHiddenPortIds),
+        );
+        expect(
+          activeResult.interiorHiddenPortIds,
+          equals(fullResult.interiorHiddenPortIds),
+        );
+        expect(
+          activeResult.unconnectedPortIds,
+          equals(fullResult.unconnectedPortIds),
+        );
+        expect(
+          activeResult.interiorUnconnectedPortIds,
+          equals(fullResult.interiorUnconnectedPortIds),
+        );
+      },
+    );
+
     test('after port expansion, primitive other ports in exteriorHidden', () {
       final graph = _buildBlocksOnlyGraph();
 

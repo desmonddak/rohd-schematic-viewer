@@ -416,9 +416,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       _applyExpansionMode(parsedAdapter, effectiveMode);
 
       // Serialize to JS format and compute layout with timeout.
-      // toJsGraph() handles all expansion states (collapsed, partial, full).
+      // The active ELK projection handles collapsed and partial expansion.
       final jsStart = DateTime.now();
-      final elkGraph = parsedAdapter.schematic.toJsGraph();
+      final elkGraph = parsedAdapter.schematic.toActiveJsGraph();
       final jsEnd = DateTime.now();
       if (kPerfLog) {
         debugPrint(
@@ -487,7 +487,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   /// `schematicAdapter`'s in-memory graph.
   ///
   /// Called once after `NetlistSchematicAdapter.fromJson()` and before
-  /// `toJsGraph()` in `computeLayout`.  The adapter builder has already
+  /// `toActiveJsGraph()` in `computeLayout`. The adapter builder has already
   /// set the top module to blocks-only (the `defaultView` behaviour),
   /// so we undo/augment that as needed.
   void _applyExpansionMode(
@@ -505,7 +505,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       case SchematicExpansionMode.collapsed:
         // The adapter builder already put the top module into blocks-only
         // mode (partialChildIds set).  Partial children are not physically
-        // moved — they're revealed during toJsGraph() serialization.
+        // moved — they're revealed during active ELK serialization.
         // To collapse, simply clear the partial markers on every node.
         void clearPartials(LayoutNode node) {
           node
@@ -638,7 +638,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       }
 
       // Re-serialize and compute layout
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
 
       newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
@@ -731,7 +731,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -831,7 +831,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -932,7 +932,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1105,7 +1105,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1402,7 +1402,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1512,7 +1512,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1598,7 +1598,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1689,7 +1689,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1772,7 +1772,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1854,7 +1854,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -1940,7 +1940,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -2049,7 +2049,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,
@@ -2131,7 +2131,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         return null;
       }
 
-      final elkGraph = schematicAdapter!.schematic.toJsGraph();
+      final elkGraph = schematicAdapter!.schematic.toActiveJsGraph();
       final newLayout = await engine.computeLayoutFromElkGraph(
         elkGraph,
         sessionId: _sessionId,

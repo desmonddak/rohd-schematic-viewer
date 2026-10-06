@@ -2051,7 +2051,11 @@ class SchematicGraph {
   ///
   /// Hyperedges are expanded on-the-fly during `LayoutNode.toJson` — no
   /// separate expansion or filtering step is needed.
-  String toJsGraph() {
+  ///
+  /// [includeHiddenState] retains recursive `_children` and `_edges` fields
+  /// for persistence and compatibility tooling. ELK layout should use
+  /// [toActiveJsGraph] to avoid materializing collapsed hierarchy data.
+  String toJsGraph({bool includeHiddenState = true}) {
     // Phase 1: Temporarily move partial children into visible lists.
     _applyPartialExpansions(root);
 
@@ -2059,13 +2063,21 @@ class SchematicGraph {
     _prepareNodeSizes(root);
 
     // Phase 3: Serialize (edge expansion + filtering happen inside toJson).
-    final json = jsonEncode(root.toJson());
+    final json = jsonEncode(
+      root.toJson(includeHiddenState: includeHiddenState),
+    );
 
     // Phase 4: Restore original child/hidden-child lists.
     _restorePartialExpansions(root);
 
     return json;
   }
+
+  /// Serialize only active hierarchy geometry for an ELK layout request.
+  ///
+  /// Collapsed descendants remain in the Dart graph but are represented by
+  /// compact `hwMeta` flags and port-marker sets instead of recursive JSON.
+  String toActiveJsGraph() => toJsGraph(includeHiddenState: false);
 
   // -----------------------------------------------------------------------
   // Partial expansion helpers

@@ -515,6 +515,33 @@ class SchematicSizeConstants {
   static const constNodePadding = (0.5, 1.0, 0.0, 1.0);
 }
 
+/// Compact hidden-state fields carried through an active ELK projection.
+///
+/// Values are stored in `hwMeta` because ELK preserves that application
+/// metadata while dropping unknown top-level fields.
+class ElkLayoutMetadata {
+  ElkLayoutMetadata._();
+
+  /// Whether the source node has collapsed direct children.
+  static const hasHiddenChildren = '_elkHasHiddenChildren';
+
+  /// Whether a collapsed direct child is itself hierarchical.
+  static const hasHiddenNonPrimitiveChildren =
+      '_elkHasHiddenNonPrimitiveChildren';
+
+  /// Whether any direct child is hierarchical, visible or collapsed.
+  static const hasNonPrimitiveChildren = '_elkHasNonPrimitiveChildren';
+
+  /// Whether the source node has connectivity excluded from the ELK input.
+  static const hasHiddenEdges = '_elkHasHiddenEdges';
+
+  /// Port IDs on children whose parent-scope wires are currently hidden.
+  static const hiddenExteriorPortIds = '_elkHiddenExteriorPortIds';
+
+  /// Port IDs on the source node whose internal wires are currently hidden.
+  static const hiddenInteriorPortIds = '_elkHiddenInteriorPortIds';
+}
+
 /// Translates netlist cell types to operator names for rendering.
 ///
 /// Translates netlist cell types to operator names for rendering.
@@ -1043,7 +1070,11 @@ class LayoutNode {
   }
 
   /// Convert to JSON map for ELK JS serialization.
-  Map<String, dynamic> toJson() {
+  ///
+  /// When [includeHiddenState] is false, hidden descendants and hidden edge
+  /// maps are replaced with compact metadata. This keeps ELK input bounded by
+  /// the active hierarchy while preserving canvas expansion affordances.
+  Map<String, dynamic> toJson({bool includeHiddenState = true}) {
     // Build a local resolver: nodeId → (portIndex → portId string).
     String resolvePort(String nodeId, int portIndex) {
       if (nodeId == id) {
@@ -1067,6 +1098,27 @@ class LayoutNode {
     // Build edge JSON from hyperedges on-the-fly (expansion + visibility).
     final visibleEdgeJson = <Map<String, dynamic>>[];
     final hiddenEdgeJson = <Map<String, dynamic>>[];
+    final hiddenExteriorPortIds = <String>{};
+    final hiddenInteriorPortIds = <String>{};
+    var hasHiddenEdges = false;
+    void recordHiddenEdgePorts(Map<String, dynamic> edgeMap) {
+      hasHiddenEdges = true;
+      final source = edgeMap['source']?.toString();
+      final sourcePort = edgeMap['sourcePort']?.toString();
+      final target = edgeMap['target']?.toString();
+      final targetPort = edgeMap['targetPort']?.toString();
+      if (sourcePort != null && source != null) {
+        (source == id ? hiddenInteriorPortIds : hiddenExteriorPortIds).add(
+          sourcePort,
+        );
+      }
+      if (targetPort != null && target != null) {
+        (target == id ? hiddenInteriorPortIds : hiddenExteriorPortIds).add(
+          targetPort,
+        );
+      }
+    }
+
     // Self-referencing edges (port-to-port passthrough) that need dummy
     // split nodes for ELK routing.  Deduplicated by (srcPort, tgtPort).
     final selfEdgesByPortPair = <String, Map<String, dynamic>>{};
@@ -1089,7 +1141,11 @@ class LayoutNode {
               final key = '${edgeMap['sourcePort']}|${edgeMap['targetPort']}';
               selfEdgesByPortPair.putIfAbsent(key, () => edgeMap);
             } else {
-              hiddenEdgeJson.add(edgeMap);
+              if (includeHiddenState) {
+                hiddenEdgeJson.add(edgeMap);
+              } else {
+                recordHiddenEdgePorts(edgeMap);
+              }
             }
             continue;
           }
@@ -1098,7 +1154,11 @@ class LayoutNode {
           if (allowed && bothVisible) {
             visibleEdgeJson.add(edgeMap);
           } else {
-            hiddenEdgeJson.add(edgeMap);
+            if (includeHiddenState) {
+              hiddenEdgeJson.add(edgeMap);
+            } else {
+              recordHiddenEdgePorts(edgeMap);
+            }
           }
         }
       }
@@ -1159,21 +1219,52 @@ class LayoutNode {
     }
 
     // Assemble children list including dummy passthrough nodes.
-    final childrenJson = children.map((c) => c.toJson()).toList()
+    final childrenJson = children
+        .map((child) => child.toJson(includeHiddenState: includeHiddenState))
+        .toList()
       ..addAll(dummyChildren);
+    final hasHiddenChildren =
+        hiddenChildren != null && hiddenChildren!.isNotEmpty;
+    bool isNonPrimitive(LayoutNode child) =>
+        child.children.isNotEmpty ||
+        (child.hiddenChildren != null && child.hiddenChildren!.isNotEmpty);
+    final hasHiddenNonPrimitiveChildren =
+        hasHiddenChildren && hiddenChildren!.any(isNonPrimitive);
+    final hasNonPrimitiveChildren = children.any(isNonPrimitive) ||
+        (hiddenChildren?.any(isNonPrimitive) ?? false);
+    final serializedHwMeta = <String, dynamic>{
+      ...hwMeta.toJson(),
+      if (!includeHiddenState && hasHiddenChildren)
+        ElkLayoutMetadata.hasHiddenChildren: true,
+      if (!includeHiddenState && hasHiddenNonPrimitiveChildren)
+        ElkLayoutMetadata.hasHiddenNonPrimitiveChildren: true,
+      if (!includeHiddenState && hasNonPrimitiveChildren)
+        ElkLayoutMetadata.hasNonPrimitiveChildren: true,
+      if (!includeHiddenState && hasHiddenEdges)
+        ElkLayoutMetadata.hasHiddenEdges: true,
+      if (!includeHiddenState && hiddenExteriorPortIds.isNotEmpty)
+        ElkLayoutMetadata.hiddenExteriorPortIds:
+            hiddenExteriorPortIds.toList(growable: false),
+      if (!includeHiddenState && hiddenInteriorPortIds.isNotEmpty)
+        ElkLayoutMetadata.hiddenInteriorPortIds:
+            hiddenInteriorPortIds.toList(growable: false),
+    };
 
     return {
       'id': id,
-      'hwMeta': hwMeta.toJson(),
+      'hwMeta': serializedHwMeta,
       'properties': properties,
       if (hierarchyNodeId != null) 'hierarchyNodeId': hierarchyNodeId,
       if (elkPorts.isNotEmpty)
         'ports': elkPorts.map((p) => p.toJson()).toList(),
       if (childrenJson.isNotEmpty) 'children': childrenJson,
-      if (hiddenChildren != null && hiddenChildren!.isNotEmpty)
+      if (includeHiddenState &&
+          hiddenChildren != null &&
+          hiddenChildren!.isNotEmpty)
         '_children': hiddenChildren!.map((c) => c.toJson()).toList(),
       if (visibleEdgeJson.isNotEmpty) 'edges': visibleEdgeJson,
-      if (hiddenEdgeJson.isNotEmpty) '_edges': hiddenEdgeJson,
+      if (includeHiddenState && hiddenEdgeJson.isNotEmpty)
+        '_edges': hiddenEdgeJson,
       if (isPartiallyExpanded) 'isPartiallyExpanded': true,
       if (slimConnectedPortIds != null && slimConnectedPortIds!.isNotEmpty)
         '_connectedPorts': slimConnectedPortIds!.toList(),

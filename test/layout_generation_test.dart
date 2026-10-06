@@ -8,7 +8,7 @@
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
 import 'dart:async' show Completer;
-import 'dart:convert' show jsonEncode;
+import 'dart:convert' show jsonDecode, jsonEncode;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -53,6 +53,30 @@ void main() {
     expect(state._adapterRootName, 'NewTop');
     expect(state._committedLayout!.instances.single.id, 'new-layout');
   });
+
+  testWidgets('layout requests omit collapsed ELK descendants', (tester) async {
+    final engine = _ControlledLayoutEngine();
+    final hostKey = GlobalKey<_GenerationHostState>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: _GenerationHost(key: hostKey, engine: engine)),
+    );
+
+    final request = hostKey.currentState!._load(
+      _nestedNetlist(),
+      SchematicExpansionMode.defaultView,
+    );
+    await _pumpUntilRequestCount(tester, engine, 1);
+
+    final elkGraph =
+        jsonDecode(engine._elkGraphs.single) as Map<String, dynamic>;
+    expect(_containsKey(elkGraph, '_children'), isFalse);
+    expect(_containsKey(elkGraph, '_edges'), isFalse);
+
+    engine._requests.single.complete(_layout('active-layout'));
+    await tester.pump();
+    await request;
+  });
 }
 
 Future<void> _pumpUntilRequestCount(
@@ -83,6 +107,52 @@ String _netlist(String moduleName) => jsonEncode({
         },
       },
     });
+
+String _nestedNetlist() => jsonEncode({
+      'modules': {
+        'Top': {
+          'attributes': {'top': 1},
+          'ports': <String, dynamic>{},
+          'netnames': <String, dynamic>{},
+          'cells': {
+            'middle': {
+              'type': 'Middle',
+              'port_directions': <String, dynamic>{},
+              'connections': <String, dynamic>{},
+            },
+          },
+        },
+        'Middle': {
+          'ports': <String, dynamic>{},
+          'netnames': <String, dynamic>{},
+          'cells': {
+            'leaf': {
+              'type': 'Leaf',
+              'port_directions': <String, dynamic>{},
+              'connections': <String, dynamic>{},
+            },
+          },
+        },
+        'Leaf': {
+          'ports': <String, dynamic>{},
+          'netnames': <String, dynamic>{},
+          'cells': <String, dynamic>{},
+        },
+      },
+    });
+
+bool _containsKey(Object? value, String key) {
+  if (value is Map) {
+    if (value.containsKey(key)) {
+      return true;
+    }
+    return value.values.any((child) => _containsKey(child, key));
+  }
+  if (value is List) {
+    return value.any((child) => _containsKey(child, key));
+  }
+  return false;
+}
 
 SchematicLayoutResult _layout(String id) => SchematicLayoutResult(
       instances: [
@@ -141,6 +211,7 @@ class _GenerationHostState extends BaseSchematicViewerState<_GenerationHost> {
 
 class _ControlledLayoutEngine implements SchematicLayoutEngine {
   final List<Completer<SchematicLayoutResult>> _requests = [];
+  final List<String> _elkGraphs = [];
 
   @override
   bool get isAvailable => true;
@@ -155,6 +226,7 @@ class _ControlledLayoutEngine implements SchematicLayoutEngine {
     String? sessionId,
   }) {
     final request = Completer<SchematicLayoutResult>();
+    _elkGraphs.add(elkGraphJson);
     _requests.add(request);
     return request.future;
   }
