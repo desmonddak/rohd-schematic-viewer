@@ -10,6 +10,7 @@
 // 2026 January
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
+import 'package:rohd_schematic_viewer/src/schematic/schematic_data.dart';
 import 'package:rohd_schematic_viewer/src/services/schematic_layout_models.dart';
 
 /// Extracts flat [SchematicLayoutResult] from hierarchical ELK layout output.
@@ -227,8 +228,11 @@ class ElkLayoutExtractor {
     if (hasId && !skipThisNode) {
       // --- Instance ---
       final visibleChildren = _isList(elkNode['children']);
-      final hiddenChildren = _isList(elkNode['_children']);
       final hwMeta = _map(elkNode['hwMeta']);
+      final hiddenChildren = _isList(elkNode['_children']);
+      final hasHiddenChildren =
+          hiddenChildren || hwMeta[ElkLayoutMetadata.hasHiddenChildren] == true;
+      final hasHiddenEdges = hwMeta[ElkLayoutMetadata.hasHiddenEdges] == true;
       final nodeId = elkNode['id'].toString();
 
       final childIds = <String>[];
@@ -284,8 +288,8 @@ class ElkLayoutExtractor {
       // node — one with visible children, hidden children, or slim
       // _connectedPorts data.  Leaf nodes (primitives) have none of
       // these and their ports are not tracked.
-      if (_isList(elkNode['children']) ||
-          _isList(elkNode['_children']) ||
+      if (visibleChildren ||
+          hasHiddenChildren ||
           elkNode['_connectedPorts'] is List) {
         final ownPorts = elkNode['ports'];
         if (ownPorts is List) {
@@ -301,8 +305,10 @@ class ElkLayoutExtractor {
       }
 
       // Check if any hidden child is non-primitive (has children itself).
-      var hasHiddenNonPrimitive = false;
-      var hasAnyNonPrimitive = false;
+      var hasHiddenNonPrimitive =
+          hwMeta[ElkLayoutMetadata.hasHiddenNonPrimitiveChildren] == true;
+      var hasAnyNonPrimitive =
+          hwMeta[ElkLayoutMetadata.hasNonPrimitiveChildren] == true;
       final hiddenList = elkNode['_children'];
       if (hiddenList is List) {
         for (final hc in hiddenList) {
@@ -344,7 +350,7 @@ class ElkLayoutExtractor {
           isExternalPort: hwMeta['isExternalPort'] == true,
           cssClass: (hwMeta['cssClass'] ?? '').toString(),
           children: childIds,
-          hasChildren: visibleChildren || hiddenChildren,
+          hasChildren: visibleChildren || hasHiddenChildren,
           isExpanded: visibleChildren,
           isPartiallyExpanded: elkNode['isPartiallyExpanded'] == true,
           hasHiddenNonPrimitiveChildren: hasHiddenNonPrimitive,
@@ -401,6 +407,14 @@ class ElkLayoutExtractor {
         exteriorHidden,
         interiorHidden,
       );
+      _addPortIds(
+        hwMeta[ElkLayoutMetadata.hiddenExteriorPortIds],
+        exteriorHidden,
+      );
+      _addPortIds(
+        hwMeta[ElkLayoutMetadata.hiddenInteriorPortIds],
+        interiorHidden,
+      );
 
       // --- Slim-connected ports: interior markers from slim attribute ---
       // Slim modules carry a _connectedPorts list indicating which ports
@@ -435,7 +449,9 @@ class ElkLayoutExtractor {
       // real edge data populates these sets and the difference logic
       // (exteriorHidden - exteriorVisible) naturally suppresses markers
       // for ports whose wires are already visible.
-      if (!_isList(elkNode['edges']) && !_isList(elkNode['_edges'])) {
+      if (!_isList(elkNode['edges']) &&
+          !_isList(elkNode['_edges']) &&
+          !hasHiddenEdges) {
         final visChildren = elkNode['children'];
         if (visChildren is List) {
           for (final child in visChildren) {
@@ -448,8 +464,11 @@ class ElkLayoutExtractor {
                     if (portId != null) {
                       exteriorHidden.add(portId);
                       // Interior marker when child can be drilled into.
+                      final childHwMeta = _map(child['hwMeta']);
                       if (_isList(child['children']) ||
-                          _isList(child['_children'])) {
+                          _isList(child['_children']) ||
+                          childHwMeta[ElkLayoutMetadata.hasHiddenChildren] ==
+                              true) {
                         interiorHidden.add(portId);
                       }
                     }
@@ -530,6 +549,26 @@ class ElkLayoutExtractor {
         exteriorHidden,
         interiorHidden,
       );
+      final rootHwMeta = _map(elkNode['hwMeta']);
+      _addPortIds(
+        rootHwMeta[ElkLayoutMetadata.hiddenExteriorPortIds],
+        exteriorHidden,
+      );
+      _addPortIds(
+        rootHwMeta[ElkLayoutMetadata.hiddenInteriorPortIds],
+        interiorHidden,
+      );
+    }
+  }
+
+  static void _addPortIds(dynamic rawPortIds, Set<String> destination) {
+    if (rawPortIds is! List) {
+      return;
+    }
+    for (final portId in rawPortIds) {
+      if (portId != null) {
+        destination.add(portId.toString());
+      }
     }
   }
 
