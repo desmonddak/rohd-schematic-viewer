@@ -106,9 +106,10 @@ Common targets:
 | `make linux-run-debug` | Run Linux app in debug mode |
 | `make linux-run-profile` | Run Linux app in profile mode |
 | `make linux-run-release` | Run Linux app in release mode |
-| `make build` / `make extension` | Build the packaged VS Code extension zip |
-| `make install-local` | Install the extension zip into local VS Code |
-| `make install-remote` / `make install` | Install the extension zip into VS Code Server |
+| `make build` / `make extension` / `make vsix` | Build the Marketplace-ready VSIX |
+| `make verify-vsix` | Verify VSIX structure and the Wasm/JavaScript fallback assets |
+| `make install-local` | Install the VSIX into local VS Code |
+| `make install-remote` / `make install` | Install the VSIX into VS Code Server |
 | `make clean` | Remove extension, web, and Linux build artifacts |
 | `make real-clean` | Run `make clean`, `flutter clean`, remove Node dependencies, dependency-source task state, and staged generated assets |
 
@@ -175,7 +176,75 @@ Build the extension package:
 make build
 ```
 
-The package is written under `build/` as a slim zip named from `package.json` and the version in `pubspec.yaml`. `make build` stages JS assets, builds Flutter web output when needed, syncs the extension version, and calls `scripts/build_extension.sh`.
+The Marketplace-ready package is written under `build/` as
+`rohd-schematic-viewer-<version>.vsix`, named from `package.json` and the
+version in `pubspec.yaml`. Its Marketplace identity is
+`intel.rohd-schematic-viewer`. `make build` stages JS assets, builds the
+Flutter release web output, and packages the curated staging directory with
+the pinned `@vscode/vsce` CLI.
+
+The VSIX includes Flutter's Wasm output (`main.dart.wasm` and
+`main.dart.mjs`) and JavaScript fallback (`main.dart.js`). Flutter uses its
+JavaScript bootstrap to select Wasm where the webview supports it and fall back
+to JavaScript otherwise. Run:
+
+```bash
+make verify-vsix
+```
+
+to verify that those artifacts and the extension manifest are present.
+
+The loader fallback is capability-based; it does not restart an application
+in JavaScript after an arbitrary Wasm runtime error.
+
+To test both runtimes in the existing package:
+
+```bash
+npm ci
+npx playwright install chromium
+make test-vsix
+```
+
+The smoke test extracts the VSIX and executes its extension-generated HTML,
+Flutter bootstraps, and bundled ELK code in Chromium. The document and resources
+use different local origins, matching the constraint that prevents browser
+history writes in VS Code webviews. Both Wasm and JavaScript fallback must
+render a schematic and open wire search without writing browser history.
+Screenshots, logs, and the tested VSIX SHA-256 are saved in `build/vsix-smoke/`.
+This browser test complements, but does not replace, testing in real VS Code.
+Neither `make verify-vsix` nor `make test-vsix` rebuilds the package.
+
+Run the source-level browser regressions with `make test-web`. These check
+startup, ELK loading order, and rendered port-label colors in both themes under
+both web compilers. For reproducible browser selection, set `CHROME_EXECUTABLE`
+to the path printed by
+`node -p "require('playwright').chromium.executablePath()"`.
+
+### GitHub artifact and admin publication
+
+The `Extension release artifact` GitHub Actions workflow runs from version
+tags and manual dispatches. It installs dependencies, runs the browser
+regressions, builds the release Wasm/JavaScript VSIX once, verifies and
+smoke-tests that archive, then uploads it with a SHA-256 checksum. The VSIX
+artifact is retained for 90 days; browser test evidence is retained separately
+for 30 days. A failing verification or smoke test prevents the VSIX upload.
+
+An authorized Intel Marketplace publisher admin can:
+
+1. Open the successful workflow run and download the artifact linked in its
+   job summary.
+2. Extract the GitHub artifact ZIP to obtain the `.vsix` and `.vsix.sha256`.
+3. Verify it with `sha256sum -c rohd-schematic-viewer-<version>.vsix.sha256`.
+4. Install and review that exact VSIX in the intended VS Code environment.
+5. Upload the `.vsix`, not the GitHub ZIP, at the
+   [Marketplace publisher management page](https://marketplace.visualstudio.com/manage/publishers).
+   Select the Intel publisher and create or update the extension.
+
+The workflow does not publish and needs no Marketplace credentials.
+Marketplace signing happens after publication, not during local packaging.
+Publisher access must already be granted to the admin; setting `publisher` in
+the manifest does not grant it. A future protected publishing job can use
+`vsce publish --packagePath` on the downloaded artifact without rebuilding it.
 
 Install into the current VS Code Server environment:
 

@@ -1,0 +1,4 @@
+# The extension staging directory contains curated runtime files only.
+.vscodeignore
+scripts/
+flutter_web/flutter_service_worker.js

@@ -462,7 +462,7 @@ class SchematicEditorProvider {
     // Remove X-UA-Compatible meta tag (not supported in webview)
     indexHtml = indexHtml.replace(/<meta[^>]*http-equiv="X-UA-Compatible"[^>]*>/gi, '');
     
-    // Inject the schematic JSON data as a global variable before Flutter loads
+    // Inject the schematic JSON data as a global variable before Flutter loads.
     const injectScript = `<script>
       window.SCHEMATIC_JSON_BASE64 = "${jsonBase64}";
       window.VSCODE_WEBVIEW = true;
@@ -475,7 +475,7 @@ class SchematicEditorProvider {
     const csp = `default-src 'none'; connect-src ${webview.cspSource} https: blob:; style-src ${webview.cspSource} 'unsafe-inline' https:; script-src ${webview.cspSource} 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https: blob:; img-src ${webview.cspSource} https: data: blob:; font-src ${webview.cspSource} https: data:; worker-src ${webview.cspSource} blob:;`;
     indexHtml = indexHtml.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '');
     indexHtml = indexHtml.replace('<head>', `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">`);
-    
+
     outputChannel.appendLine('Generated Flutter HTML, length: ' + indexHtml.length);
     
     return indexHtml;

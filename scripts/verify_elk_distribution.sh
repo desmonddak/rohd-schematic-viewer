@@ -119,30 +119,30 @@ fi
 printf 'Verified standalone web output.\n'
 
 shopt -s nullglob
-archives=("$ROOT"/build/*-slim.zip)
+archives=("$ROOT"/build/*.vsix)
 [[ "${#archives[@]}" -eq 1 ]] ||
-    fail 'Expected exactly one embedded extension ZIP; run make extension first'
+    fail 'Expected exactly one Marketplace VSIX; run make extension first'
 archive="${archives[0]}"
 load_archive_entries "$archive"
-verify_archive_entry 'THIRD_PARTY_NOTICES.md'
-verify_archive_entry 'assets/js/elk.bundled.js'
-verify_archive_entry 'assets/js/LICENSE'
-verify_archive_entry 'assets/js/README.md'
-verify_archive_entry 'assets/licenses/elkjs_LICENSES.txt'
-verify_archive_entry 'flutter_web/assets/assets/js/elk.bundled.js'
-verify_archive_entry 'flutter_web/assets/assets/js/LICENSE'
-verify_archive_entry 'flutter_web/assets/assets/js/README.md'
-verify_archive_entry 'flutter_web/assets/assets/licenses/elkjs_LICENSES.txt'
+verify_archive_entry 'extension/THIRD_PARTY_NOTICES.md'
+verify_archive_entry 'extension/assets/js/elk.bundled.js'
+verify_archive_entry 'extension/assets/js/LICENSE'
+verify_archive_entry 'extension/assets/js/README.md'
+verify_archive_entry 'extension/assets/licenses/elkjs_LICENSES.txt'
+verify_archive_entry 'extension/flutter_web/assets/assets/js/elk.bundled.js'
+verify_archive_entry 'extension/flutter_web/assets/assets/js/LICENSE'
+verify_archive_entry 'extension/flutter_web/assets/assets/js/README.md'
+verify_archive_entry 'extension/flutter_web/assets/assets/licenses/elkjs_LICENSES.txt'
 
-archive_elk_sha256="$(unzip -p "$archive" 'assets/js/elk.bundled.js' | sha256sum | awk '{print $1}')"
+archive_elk_sha256="$(unzip -p "$archive" 'extension/assets/js/elk.bundled.js' | sha256sum | awk '{print $1}')"
 [[ "$archive_elk_sha256" == "$EXPECTED_ELK_SHA256" ]] ||
-    fail "ELK hash mismatch in embedded package: $archive_elk_sha256"
-cmp -s "$LICENSE_ASSET" <(unzip -p "$archive" 'assets/licenses/elkjs_LICENSES.txt') ||
+    fail "ELK hash mismatch in Marketplace VSIX: $archive_elk_sha256"
+cmp -s "$LICENSE_ASSET" <(unzip -p "$archive" 'extension/assets/licenses/elkjs_LICENSES.txt') ||
     fail 'ELK license notice differs in embedded package'
-cmp -s "$JS_LICENSE_ASSET" <(unzip -p "$archive" 'assets/js/LICENSE') ||
+cmp -s "$JS_LICENSE_ASSET" <(unzip -p "$archive" 'extension/assets/js/LICENSE') ||
     fail 'ELK js/LICENSE differs in embedded package'
-cmp -s "$JS_README_ASSET" <(unzip -p "$archive" 'assets/js/README.md') ||
+cmp -s "$JS_README_ASSET" <(unzip -p "$archive" 'extension/assets/js/README.md') ||
     fail 'ELK js/README.md differs in embedded package'
-printf 'Verified embedded extension package: %s\n' "${archive#$ROOT/}"
+printf 'Verified Marketplace VSIX: %s\n' "${archive#$ROOT/}"
 
 printf 'ELK distribution verification passed.\n'

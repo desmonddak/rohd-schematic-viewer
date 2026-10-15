@@ -1206,6 +1206,10 @@ class SchematicPainter extends CustomPainter {
       }
 
       final isOperatorParent = (parentInstance?.cls == 'Operator');
+      final isLogicBlockParent = parentInstance != null &&
+          isOperatorParent &&
+          (parentInstance.name == 'COMBINATIONAL' ||
+              parentInstance.name == 'SEQUENTIAL');
       final isConstParent = parentInstance != null &&
           (parentInstance.cls.isEmpty ||
               parentInstance.cls.toLowerCase() == 'const' ||
@@ -1262,11 +1266,13 @@ class SchematicPainter extends CustomPainter {
         continue; // Skip normal port label logic for all CONCAT/SLICE ports
       }
 
-      // Draw port labels unless this is an operator gate.
-      if (port.name.isNotEmpty && !isOperatorParent) {
-        // Const blocks have blue operator fill — use white text for contrast.
+      // Primitive gates suppress pin names, but logic blocks need named ports.
+      if (port.name.isNotEmpty && (!isOperatorParent || isLogicBlockParent)) {
+        // Filled blocks need white text; hierarchy boundaries have no fill.
         final portLabelColor =
-            isConstParent ? Colors.white : colorScheme.nodeText;
+            isConstParent || (isLogicBlockParent && !parentInstance.hasChildren)
+                ? Colors.white
+                : colorScheme.nodeText;
         final isParentExpanded = parentInstance?.isExpanded ?? false;
 
         var textY = adjustedY +

@@ -13,7 +13,7 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="$1"
 if [ -z "$PKG" ]; then
-  echo "Usage: $0 <path-to-zip>" >&2
+  echo "Usage: $0 <path-to-vsix>" >&2
   exit 2
 fi
 if [ ! -f "$PKG" ]; then
