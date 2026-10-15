@@ -79,7 +79,7 @@ jobs:
         id: artifact
         uses: actions/upload-artifact@v4
         with:
-          name: intel-rohd-schematic-viewer-${{ steps.package.outputs.version }}-${{ github.sha }}
+          name: intel-corporation-rohd-schematic-viewer-${{ steps.package.outputs.version }}-${{ github.sha }}
           path: |
             ${{ steps.package.outputs.vsix }}
             ${{ steps.package.outputs.vsix }}.sha256
@@ -105,7 +105,7 @@ jobs:
             echo
             echo "Download the [tested VSIX artifact](${ARTIFACT_URL}) and extract the GitHub artifact ZIP."
             echo 'Verify the included checksum, then install and review the VSIX in the target VS Code environment.'
-            echo 'An authorized Intel Marketplace publisher admin can upload the contained VSIX through the publisher management page.'
+            echo 'An authorized admin for the intel-corporation Marketplace publisher can upload the contained VSIX through the publisher management page.'
             echo 'Do not upload the GitHub ZIP or rebuild the package before publication.'
             echo
             echo 'Marketplace signing happens after publication. This workflow does not publish or require Marketplace credentials.'

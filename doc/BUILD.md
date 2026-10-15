@@ -179,7 +179,7 @@ make build
 The Marketplace-ready package is written under `build/` as
 `rohd-schematic-viewer-<version>.vsix`, named from `package.json` and the
 version in `pubspec.yaml`. Its Marketplace identity is
-`intel.rohd-schematic-viewer`. `make build` stages JS assets, builds the
+`intel-corporation.rohd-schematic-viewer`. `make build` stages JS assets, builds the
 Flutter release web output, and packages the curated staging directory with
 the pinned `@vscode/vsce` CLI.
 
@@ -229,7 +229,7 @@ smoke-tests that archive, then uploads it with a SHA-256 checksum. The VSIX
 artifact is retained for 90 days; browser test evidence is retained separately
 for 30 days. A failing verification or smoke test prevents the VSIX upload.
 
-An authorized Intel Marketplace publisher admin can:
+An authorized admin for the `intel-corporation` Marketplace publisher can:
 
 1. Open the successful workflow run and download the artifact linked in its
    job summary.
@@ -238,7 +238,7 @@ An authorized Intel Marketplace publisher admin can:
 4. Install and review that exact VSIX in the intended VS Code environment.
 5. Upload the `.vsix`, not the GitHub ZIP, at the
    [Marketplace publisher management page](https://marketplace.visualstudio.com/manage/publishers).
-   Select the Intel publisher and create or update the extension.
+   Select the `intel-corporation` publisher and create or update the extension.
 
 The workflow does not publish and needs no Marketplace credentials.
 Marketplace signing happens after publication, not during local packaging.

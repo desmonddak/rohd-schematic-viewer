@@ -90,8 +90,8 @@ package_publisher="$(
   fail "VSIX package version $package_version does not match pubspec $pubspec_version"
 [[ "$package_publisher" == "$source_publisher" ]] ||
   fail "VSIX package publisher $package_publisher does not match package.json $source_publisher"
-[[ "$package_publisher" == "intel" ]] ||
-  fail "VSIX package publisher must be intel, got $package_publisher"
+[[ "$package_publisher" == "intel-corporation" ]] ||
+  fail "VSIX package publisher must be intel-corporation, got $package_publisher"
 
 printf 'Verified Marketplace VSIX: %s (%s.rohd-schematic-viewer %s, Wasm + JS fallback present).\n' \
   "${VSIX#$ROOT/}" "$package_publisher" "$package_version"
