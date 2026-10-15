@@ -1,4 +1,8 @@
 
+## 0.2.3
+
+- Changed the VS Code Marketplace publisher ID to `intel-corporation`.
+
 ## 0.2.2
 
 - Fixed Wasm startup in VS Code by disabling browser history for both web

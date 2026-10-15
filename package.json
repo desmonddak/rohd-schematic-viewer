@@ -2,9 +2,9 @@
   "name": "rohd-schematic-viewer",
   "displayName": "ROHD Schematic Viewer",
   "description": "Visualize Yosys JSON netlist files as interactive schematics",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "license": "BSD-3-Clause",
-  "publisher": "intel",
+  "publisher": "intel-corporation",
   "repository": {
     "type": "git",
     "url": "https://github.com/intel/rohd-schematic-viewer.git"
