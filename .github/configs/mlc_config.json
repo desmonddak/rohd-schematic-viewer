@@ -16,7 +16,13 @@
         "pattern":"^https://raw.githubusercontent.com/intel/rohd-schematic-viewer/refs/heads/badges/coverage/main.svg$"
       },
       {
-        "pattern":"^https://intel.github.io/rohd-schematic-viewer/api/?$"
+        "pattern":"^https://intel\\.github\\.io/rohd-schematic-viewer(?:/.*)?$"
+      },
+      {
+        "pattern":"^https://marketplace\\.visualstudio\\.com/manage/publishers/?$"
+      },
+      {
+        "pattern":"^https://github\\.com/intel/rohd-schematic-viewer/blob/main/\\.github/workflows/coverage\\.yml$"
       }
     ]
   }
