@@ -81,5 +81,18 @@ jobs:
       - name: Build extension package
         run: make extension
 
+      - name: Install browser test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Test web platform initialization
+        run: |
+          export CHROME_EXECUTABLE="$(node -p "require('playwright').chromium.executablePath()")"
+          make test-web
+
+      - name: Verify packaged extension runtimes
+        run: make verify-vsix test-vsix
+
       - name: Verify ELK distribution
         run: make verify-elk-distribution

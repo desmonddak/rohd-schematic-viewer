@@ -1,6 +1,16 @@
 
 ## 0.2.1
 
+- Fixed Wasm startup in VS Code by disabling browser history for both web
+  compilers before widget initialization.
+
+- Restored missing COMBINATIONAL and SEQUENTIAL input/output port labels,
+  drawing them in white over the original solid blue fill.
+
+- Added standard Intel VSIX packaging with Wasm and JavaScript fallback,
+  packaged-runtime smoke tests, and verified GitHub artifacts for manual
+  Marketplace publication.
+
 - Added an App Bar settings menu with a **Display widths** control for showing or hiding blue multi-bit signal-width overlays without recomputing the schematic layout.
 
 - Prevented large PNG exports from clipping the visible schematic by reducing output raster resolution as needed while preserving the complete current

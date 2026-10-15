@@ -3,7 +3,8 @@
   "displayName": "ROHD Schematic Viewer",
   "description": "Visualize Yosys JSON netlist files as interactive schematics",
   "version": "0.2.1",
-  "publisher": "rohd",
+  "license": "BSD-3-Clause",
+  "publisher": "intel",
   "repository": {
     "type": "git",
     "url": "https://github.com/intel/rohd-schematic-viewer.git"
@@ -69,8 +70,12 @@
     }
   },
   "scripts": {
-    "build:extension": "sh ./scripts/build_extension.sh",
-    "install:server": "sh ./scripts/install_extension_server.sh build/vscode-schematic-viewer-*.zip",
+    "build:extension": "make extension",
+    "test:vsix": "node scripts/test_extension_vsix.cjs",
+    "install:server": "sh ./scripts/install_extension_server.sh build/rohd-schematic-viewer-*.vsix",
     "clean:builds": "sh ./scripts/clean_builds.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
   }
 }

@@ -19,9 +19,9 @@ import 'package:rohd_schematic_viewer/src/platform/url_strategy.dart';
 
 /// Initializes and runs the standalone schematic viewer application.
 Future<void> main() async {
+  configureUrlStrategyIfWeb();
   WidgetsFlutterBinding.ensureInitialized();
   await initAppVersion();
-  configureUrlStrategyIfWeb();
   initializeKeyboardHandling();
   runApp(const SchematicViewerApp());
 }

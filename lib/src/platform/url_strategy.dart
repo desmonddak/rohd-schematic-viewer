@@ -8,7 +8,7 @@
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
 import 'package:rohd_schematic_viewer/src/platform/url_strategy_stub.dart'
-    if (dart.library.html) 'url_strategy_web.dart';
+    if (dart.library.js_interop) 'url_strategy_web.dart';
 
 /// Configure URL strategy only on web to avoid History API issues in VS Code
 /// webviews.

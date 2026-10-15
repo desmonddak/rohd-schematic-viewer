@@ -34,18 +34,22 @@ PUBSPEC_VERSION := $(shell grep '^version:' $(ROOT)/pubspec.yaml | head -1 | sed
 # Read name from package.json; version comes from pubspec.yaml
 PKG_NAME := $(shell $(NODE) -p "require('./package.json').name")
 PKG_VERSION := $(PUBSPEC_VERSION)
-# Deterministic filenames produced by scripts
-SLIM_ZIP := $(ROOT)/build/$(PKG_NAME)-$(PKG_VERSION)-slim.zip
+VSCE_VERSION ?= 4.0.0
+VSCE ?= npx --yes @vscode/vsce@$(VSCE_VERSION)
+EXT_STAGE := $(ROOT)/build/extension/$(PKG_NAME)-$(PKG_VERSION)
 VSIX := $(ROOT)/build/$(PKG_NAME)-$(PKG_VERSION).vsix
 
-.PHONY: all help build extension vsix package clean real-clean install-local install-remote install web web-debug web-release linux linux-debug linux-release web-run web-serve linux-run-debug linux-run-profile linux-run-release clean-extension clean-web clean-linux force test coverage coverage-view coverage-clean coverity coverity-setup coverity-clean sync-version verify-elk-distribution
+.PHONY: all help build extension vsix package stage-extension verify-vsix test-vsix test-web clean real-clean install-local install-remote install web web-debug web-release linux linux-debug linux-release web-run web-serve linux-run-debug linux-run-profile linux-run-release clean-extension clean-web clean-linux force test coverage coverage-view coverage-clean coverity coverity-setup coverity-clean sync-version verify-elk-distribution
 
 help:
 	@echo "ROHD Schematic Visualizer Extension - Build Targets"
 	@echo ""
 	@echo "Extension Build Targets:"
-	@echo "  all              - Build the extension (default target)"
-	@echo "  extension        - Build VSCode extension"
+	@echo "  all              - Build the Marketplace-ready VSIX (default target)"
+	@echo "  extension        - Build Marketplace-ready VSIX"
+	@echo "  vsix             - Build Marketplace-ready VSIX"
+	@echo "  verify-vsix      - Verify the existing VSIX without rebuilding"
+	@echo "  test-vsix        - Smoke-test both runtimes in the existing VSIX"
 	@echo "  build            - (alias for extension)"
 	@echo ""
 	@echo "Web Build Targets:"
@@ -79,6 +83,7 @@ help:
 	@echo ""
 	@echo "Development Targets:"
 	@echo "  test             - Run Flutter tests"
+	@echo "  test-web         - Run browser regressions in Wasm and JavaScript"
 	@echo "  coverage         - Generate Dart LCOV and HTML coverage reports"
 	@echo "  coverage-view    - Serve coverage/html locally on port 8000"
 	@echo "  coverity         - Run configured Coverity scan workflow"
@@ -90,6 +95,13 @@ all: extension
 
 test:
 	$(FLUTTER) test $(ARGS)
+
+test-web:
+	$(FLUTTER) test --platform chrome --wasm test/url_strategy_web_test.dart test/schematic_layout_web_test.dart test/schematic_canvas_settings_test.dart
+	$(FLUTTER) test --platform chrome test/url_strategy_web_test.dart test/schematic_layout_web_test.dart test/schematic_canvas_settings_test.dart
+
+test-vsix:
+	$(NODE) scripts/test_extension_vsix.cjs "$(VSIX)"
 
 coverage:
 	@bash scripts/generate_coverage.sh
@@ -110,7 +122,7 @@ coverity-clean:
 	@bash scripts/run_coverity.sh clean
 
 package: build
-	@echo "Package available at $(SLIM_ZIP)"
+	@echo "Package available at $(VSIX)"
 
 verify-elk-distribution:
 	@bash scripts/verify_elk_distribution.sh
@@ -262,7 +274,6 @@ real-clean: clean
 clean-extension:
 	@echo "Cleaning extension build and packaging artifacts"
 	-rm -rf "$(ROOT)/build/extension"
-	-rm -f "$(SLIM_ZIP)"
 	-rm -f "$(VSIX)"
 	-rm -f "$(ROOT)"/build/*-slim.zip
 	-rm -f "$(ROOT)"/build/*.vsix
@@ -297,21 +308,35 @@ clean-linux:
 #   make install                             # debug Flutter web extension
 #   make install FLUTTER_WEB_MODE=release     # release Flutter web
 
-# Extension zip (includes Flutter web build)
-$(SLIM_ZIP): stage-js build/web/index.html scripts/copy_devtools_extension_assets.cjs | sync-version
-	@echo "Running extension build (creates zip)"
+# Curated extension staging directory. Keep VSIX creation separate so vsce
+# controls the standard Marketplace archive layout.
+$(EXT_STAGE)/package.json: sync-version stage-js build/web/index.html scripts/build_extension.sh scripts/copy_devtools_extension_assets.cjs LICENSE CODE_OF_CONDUCT.md THIRD_PARTY_NOTICES.md
+	@echo "Staging extension files..."
+	@EXT_STAGE="$(EXT_STAGE)" sh scripts/build_extension.sh
+
+stage-extension: $(EXT_STAGE)/package.json
+
+# Marketplace VSIX (includes Flutter Wasm output and JavaScript fallback).
+$(VSIX): $(EXT_STAGE)/package.json scripts/verify_extension_vsix.sh
+	@echo "Packaging Marketplace VSIX with vsce $(VSCE_VERSION)..."
 	@mkdir -p $(dir $@)
-	@OUT="$@" sh scripts/build_extension.sh
+	@cd "$(EXT_STAGE)" && $(VSCE) package --no-dependencies --out "$@"
+
+verify-vsix:
+	@bash scripts/verify_extension_vsix.sh "$(VSIX)"
 
 # Alias: build target for convenience
-build: $(SLIM_ZIP)
+build: $(VSIX)
 
 # Force rebuild of everything (clean and rebuild)
 force: clean extension
 
 # Build VSCode extension
-extension: $(SLIM_ZIP)
+extension: $(VSIX)
 	@echo "Extension build complete"
+
+vsix: $(VSIX)
+	@echo "VSIX available at $(VSIX)"
 
 # ---------------------------------------------------------------------------
 # Install targets
@@ -320,12 +345,12 @@ extension: $(SLIM_ZIP)
 # Install extension to local VS Code
 install-local: extension
 	@echo "Installing extension to local VS Code..."
-	@code --install-extension "$(SLIM_ZIP)" || echo "Note: VS Code CLI not found; install manually from $(SLIM_ZIP)"
+	@code --install-extension "$(VSIX)" || echo "Note: VS Code CLI not found; install manually from $(VSIX)"
 
 # Install extension to remote VS Code Server
 install-remote: extension
 	@echo "Installing extension to remote server extensions (~/.vscode-server/extensions)"
-	@sh scripts/install_extension_server.sh "$(SLIM_ZIP)"
+	@sh scripts/install_extension_server.sh "$(VSIX)"
 
 # Default install target
 install: install-remote
