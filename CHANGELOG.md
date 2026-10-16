@@ -1,4 +1,9 @@
 
+## 0.2.4
+
+- Use a PNG coverage badge in the shared README so Marketplace packaging
+  accepts the badge while GitHub continues to display it.
+
 ## 0.2.3
 
 - Changed the VS Code Marketplace publisher ID to `intel-corporation`.
