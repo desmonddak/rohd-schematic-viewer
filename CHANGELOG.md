@@ -1,3 +1,9 @@
+## 0.2.5
+
+- Broaden the hierarchy dependency constraint to accept 0.1.x and 0.2.x and the DevTools widgets constraint to accept 0.1.1 through 0.2.x without requiring the new widgets release first.
+- Accept ROHD 0.6.11 and 0.7.x.
+- Narrow the ROHD import to `LogicValue` so analysis also accepts ROHD versions without the deprecated `Port` alias.
+- Retain flexible Material UI 1.x constraints, allowing both the published widgets' older UI stack and Material UI 1.7.0 with widgets 0.2.0 without increasing the Dart or Flutter lower bounds.
 
 ## 0.2.4
 
