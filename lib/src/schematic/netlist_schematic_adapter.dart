@@ -10,7 +10,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:rohd/rohd.dart' hide Port, State;
+import 'package:rohd/rohd.dart' show LogicValue;
 import 'package:rohd_hierarchy/rohd_hierarchy.dart';
 import 'package:rohd_schematic_viewer/src/perf_log.dart';
 import 'package:rohd_schematic_viewer/src/schematic/schematic_data.dart';
