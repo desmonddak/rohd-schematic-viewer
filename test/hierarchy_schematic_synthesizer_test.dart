@@ -458,7 +458,6 @@ void main() {
           SignalOccurrence(name: 'bidirectional', width: 1, direction: 'inout'),
           SignalOccurrence(name: 'internal', width: 1),
         ],
-        portCount: 3,
         children: [
           for (var index = 0; index < 4; index++)
             HierarchyOccurrence(
