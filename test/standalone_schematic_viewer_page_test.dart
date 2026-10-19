@@ -14,7 +14,7 @@ import 'dart:typed_data' show ByteData, Uint8List;
 // The embedded help widget still requires Flutter's MaterialLocalizations.
 // ignore: migrate_design_widgets
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, rootBundle;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide DefaultMaterialLocalizations;
@@ -28,6 +28,62 @@ import 'package:rohd_schematic_viewer/src/ui/schematic_help_button.dart';
 import 'package:rohd_schematic_viewer/src/ui/standalone_schematic_viewer_page.dart';
 
 void main() {
+  testWidgets('loads the bundled example using its declared asset key',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final requestedKeys = <String>[];
+    final json = Uint8List.fromList(
+        utf8.encode('{"modules":{"Example":{"attributes":{"top":1},'
+            '"ports":{},"cells":{}}}}'));
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final previousHandler = messenger.allMessagesHandler;
+    messenger.allMessagesHandler = (channel, handler, message) async {
+      if (channel == 'flutter/assets') {
+        final key = utf8.decode(message!.buffer.asUint8List(
+          message.offsetInBytes,
+          message.lengthInBytes,
+        ));
+        requestedKeys.add(key);
+        if (key == 'assets/rohd_schematic.json' ||
+            key == 'rohd_schematic.json') {
+          return ByteData.sublistView(
+            key == 'assets/rohd_schematic.json'
+                ? json
+                : Uint8List.fromList(
+                    utf8.encode('<!DOCTYPE html><html></html>')),
+          );
+        }
+      }
+      return await (previousHandler != null
+          ? previousHandler(channel, handler, message)
+          : handler != null
+              ? handler(message)
+              : messenger.delegate.send(channel, message));
+    };
+    addTearDown(() {
+      messenger.allMessagesHandler = previousHandler;
+      rootBundle.clear();
+    });
+    final engine = _FakeLayoutEngine();
+    await tester.pumpWidget(
+      BlocProvider(
+        create: (_) => SchematicThemeCubit(),
+        child: MaterialApp(
+          home: StandaloneSchematicViewerPage(layoutEngine: engine),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(requestedKeys, contains('assets/rohd_schematic.json'));
+    expect(requestedKeys, isNot(contains('rohd_schematic.json')));
+    expect(engine.elkGraphs, hasLength(1));
+    expect(find.byType(SchematicCanvas), findsOneWidget);
+    expect(find.textContaining('Error computing layout'), findsNothing);
+  });
+
   testWidgets('changes theme and opens help while viewing a schematic', (
     tester,
   ) async {

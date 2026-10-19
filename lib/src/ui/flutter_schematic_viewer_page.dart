@@ -46,6 +46,9 @@ class FlutterSchematicExtensionHost {
     void Function(List<String> signalPaths)? onIncomingSignals,
   }) listenForMessages;
 
+  /// Registers disk-reload notifications for an indexed file.
+  final void Function(void Function() onReload) listenForFileReloads;
+
   /// Announces that this webview can participate in signal cross-probing.
   final bool Function() notifySignalViewerReady;
 
@@ -57,6 +60,7 @@ class FlutterSchematicExtensionHost {
     required this.isWebview,
     required this.requestReload,
     required this.listenForMessages,
+    this.listenForFileReloads = listenForIndexedFileReload,
     this.notifySignalViewerReady = postSignalViewerReady,
     this.sendSignals = postSendSignals,
   });
@@ -406,6 +410,11 @@ class _FlutterSchematicViewerPageState
   Future<void> loadInitialSchematic() async {
     // Set up message listener so the VS Code extension can push fresh data
     if (_extensionHost.isWebview) {
+      _extensionHost.listenForFileReloads(() async {
+        if (mounted) {
+          await _loadInjectedSchematic();
+        }
+      });
       _extensionHost.listenForMessages(
         onReload: (jsonData) async {
           if (!mounted) {
@@ -514,6 +523,16 @@ class _FlutterSchematicViewerPageState
           loading: false,
           errorMessage: 'VS Code webview not detected',
         );
+        return;
+      }
+
+      final source = await openInjectedNetlistFile();
+      if (!mounted) {
+        return;
+      }
+      if (source != null) {
+        await loadIndexedFile(source);
+        _queryCurrentModule();
         return;
       }
 

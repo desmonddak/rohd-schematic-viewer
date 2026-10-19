@@ -522,6 +522,9 @@ class SchematicSizeConstants {
 class ElkLayoutMetadata {
   ElkLayoutMetadata._();
 
+  /// An opaque module block, without an expandable body in this netlist.
+  static const isBlackBox = '_elkIsBlackBox';
+
   /// Whether the source node has collapsed direct children.
   static const hasHiddenChildren = '_elkHasHiddenChildren';
 
@@ -888,6 +891,12 @@ class LayoutNode {
   /// Whether this node has hidden children (is expandable).
   bool get isExpandable => hiddenChildren != null && hiddenChildren!.isNotEmpty;
 
+  /// Whether blocks-only mode should retain this node, even without a body.
+  bool get isHierarchyBlock =>
+      children.isNotEmpty ||
+      isExpandable ||
+      hwMeta.extra?[ElkLayoutMetadata.isBlackBox] == true;
+
   /// Whether this node is currently expanded (visible children present).
   bool get isExpanded => children.isNotEmpty;
 
@@ -921,8 +930,8 @@ class LayoutNode {
   /// without doing a full expand. Returns true if new children were revealed.
   /// This mirrors ElkNode behavior but operates on the LayoutNode tree.
   ///
-  /// Non-primitive nodes are those that have their own children (submodules),
-  /// whereas primitive nodes are leaf gates/operators.
+  /// Submodules and explicitly marked opaque blocks are retained; primitive
+  /// gates/operators are hidden.
   bool expandNonPrimitivesPartial() {
     if (hiddenChildren == null || hiddenChildren!.isEmpty) {
       return false;
@@ -931,7 +940,7 @@ class LayoutNode {
     // Find non-primitive hidden children (have children themselves)
     final nonPrimitiveIds = <String>{};
     for (final child in hiddenChildren!) {
-      if (child.children.isNotEmpty || child.isExpandable) {
+      if (child.isHierarchyBlock) {
         nonPrimitiveIds.add(child.id);
       }
     }
@@ -1225,13 +1234,10 @@ class LayoutNode {
       ..addAll(dummyChildren);
     final hasHiddenChildren =
         hiddenChildren != null && hiddenChildren!.isNotEmpty;
-    bool isNonPrimitive(LayoutNode child) =>
-        child.children.isNotEmpty ||
-        (child.hiddenChildren != null && child.hiddenChildren!.isNotEmpty);
     final hasHiddenNonPrimitiveChildren =
-        hasHiddenChildren && hiddenChildren!.any(isNonPrimitive);
-    final hasNonPrimitiveChildren = children.any(isNonPrimitive) ||
-        (hiddenChildren?.any(isNonPrimitive) ?? false);
+        hasHiddenChildren && hiddenChildren!.any((c) => c.isHierarchyBlock);
+    final hasNonPrimitiveChildren = children.any((c) => c.isHierarchyBlock) ||
+        (hiddenChildren?.any((c) => c.isHierarchyBlock) ?? false);
     final serializedHwMeta = <String, dynamic>{
       ...hwMeta.toJson(),
       if (!includeHiddenState && hasHiddenChildren)

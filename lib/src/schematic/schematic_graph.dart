@@ -897,13 +897,10 @@ class SchematicGraph {
           break;
         }
       }
-      // Also keep if this is a non-primitive submodule (has sub-children).
+      // Keep hierarchical and opaque module blocks even without visible wires.
       if (!keep) {
         final child = allChildMap[childId];
-        if (child != null &&
-            (child.children.isNotEmpty ||
-                (child.hiddenChildren != null &&
-                    child.hiddenChildren!.isNotEmpty))) {
+        if (child != null && child.isHierarchyBlock) {
           keep = true;
         }
       }
@@ -1628,14 +1625,10 @@ class SchematicGraph {
       return false;
     }
 
-    // Pre-check: at least one child must be non-primitive (has its own
-    // children or hiddenChildren).  Without this, we'd collapse the node
+    // Pre-check: at least one child must be a hierarchy block.
+    // Without this, we'd collapse the node
     // and have nothing to show in blocks-only mode.
-    final hasNonPrimitive = node.children.any(
-      (c) =>
-          c.children.isNotEmpty ||
-          (c.hiddenChildren != null && c.hiddenChildren!.isNotEmpty),
-    );
+    final hasNonPrimitive = node.children.any((c) => c.isHierarchyBlock);
     if (!hasNonPrimitive) {
       return false;
     }
@@ -1650,8 +1643,8 @@ class SchematicGraph {
 
   /// Expand all non-primitive (submodule) hidden children of a node.
   ///
-  /// A non-primitive child is one that has children or hidden children
-  /// of its own (i.e. it is a submodule, not a leaf/primitive gate).
+  /// Retains submodules with children and explicitly marked opaque blocks,
+  /// rather than leaf primitive gates.
   /// This also reveals the hyperedges that connect to those children.
   ///
   /// Returns `true` if new children/edges were revealed.
@@ -1666,10 +1659,10 @@ class SchematicGraph {
       return false;
     }
 
-    // Find non-primitive hidden children (have children or hiddenChildren).
+    // Find hidden hierarchy blocks.
     final nonPrimitiveIds = <String>{};
     for (final child in node.hiddenChildren!) {
-      if (child.children.isNotEmpty || child.isExpandable) {
+      if (child.isHierarchyBlock) {
         nonPrimitiveIds.add(child.id);
       }
     }

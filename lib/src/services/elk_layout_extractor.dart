@@ -304,7 +304,12 @@ class ElkLayoutExtractor {
         }
       }
 
-      // Check if any hidden child is non-primitive (has children itself).
+      bool isHierarchyBlock(Map<String, dynamic> child) =>
+          _isList(child['children']) ||
+          _isList(child['_children']) ||
+          _map(child['hwMeta'])[ElkLayoutMetadata.isBlackBox] == true;
+
+      // Check for submodules and opaque blocks.
       var hasHiddenNonPrimitive =
           hwMeta[ElkLayoutMetadata.hasHiddenNonPrimitiveChildren] == true;
       var hasAnyNonPrimitive =
@@ -313,7 +318,7 @@ class ElkLayoutExtractor {
       if (hiddenList is List) {
         for (final hc in hiddenList) {
           if (hc is Map<String, dynamic>) {
-            if (_isList(hc['children']) || _isList(hc['_children'])) {
+            if (isHierarchyBlock(hc)) {
               hasHiddenNonPrimitive = true;
               hasAnyNonPrimitive = true;
               break;
@@ -327,7 +332,7 @@ class ElkLayoutExtractor {
         if (visList is List) {
           for (final vc in visList) {
             if (vc is Map<String, dynamic>) {
-              if (_isList(vc['children']) || _isList(vc['_children'])) {
+              if (isHierarchyBlock(vc)) {
                 hasAnyNonPrimitive = true;
                 break;
               }

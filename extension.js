@@ -167,11 +167,8 @@ class SchematicEditorProvider {
 
     webviewPanel.webview.options = { enableScripts: true, localResourceRoots };
 
-    const jsonContent = await vscode.workspace.fs.readFile(document.uri);
-    const jsonText = Buffer.from(jsonContent).toString('utf8');
-
     outputChannel.appendLine('[resolveCustomEditor] Loading Flutter renderer for: ' + document.uri.fsPath);
-    webviewPanel.webview.html = this.getFlutterHtmlForWebview(webviewPanel.webview, document.uri, jsonText);
+    webviewPanel.webview.html = this.getFlutterHtmlForWebview(webviewPanel.webview, document.uri);
 
     const viewerId = `rohd-schematic-viewer:${nextViewerId++}`;
     this._webviews.set(viewerId, webviewPanel.webview);
@@ -220,7 +217,54 @@ class SchematicEditorProvider {
 
     // Handle messages from the webview (e.g., reload-from-disk, cross-probe)
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
-      if (message.type === 'signalViewerReady') {
+      if (message.type === 'netlistRead') {
+        let handle;
+        try {
+          if (!['file', 'vscode-remote'].includes(document.uri.scheme)) {
+            throw new Error('Indexed netlists require a filesystem-backed file');
+          }
+          handle = await fs.promises.open(document.uri.fsPath, 'r');
+          const stat = await handle.stat();
+          const revision = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+          if (message.revision != null && message.revision !== revision) {
+            throw new Error('Netlist changed on disk; reload the file');
+          }
+          const start = message.start;
+          const length = message.length;
+          if (!Number.isSafeInteger(start) || start < 0 ||
+              !Number.isSafeInteger(length) || length < 0 || length > 262144 ||
+              start > stat.size) {
+            throw new Error('Invalid netlist byte range');
+          }
+          const buffer = Buffer.alloc(Math.min(length, stat.size - start));
+          let bytesRead = 0;
+          while (bytesRead < buffer.length) {
+            const result = await handle.read(
+              buffer, bytesRead, buffer.length - bytesRead, start + bytesRead,
+            );
+            if (result.bytesRead === 0) {
+              throw new Error('Netlist was truncated; reload the file');
+            }
+            bytesRead += result.bytesRead;
+          }
+          const after = await handle.stat();
+          if (`${after.dev}:${after.ino}:${after.size}:${after.mtimeMs}:${after.ctimeMs}` !== revision) {
+            throw new Error('Netlist changed while reading; reload the file');
+          }
+          await webviewPanel.webview.postMessage({
+            type: 'netlistReadResult', requestId: message.requestId,
+            size: stat.size, revision, bytesBase64: buffer.toString('base64'),
+          });
+        } catch (error) {
+          outputChannel.appendLine(`[netlistRead] ${error.message}`);
+          await webviewPanel.webview.postMessage({
+            type: 'netlistReadResult', requestId: message.requestId,
+            error: error.message,
+          });
+        } finally {
+          if (handle) await handle.close();
+        }
+      } else if (message.type === 'signalViewerReady') {
         await registerSignalViewer();
       } else if (message.type === 'sendSignals') {
         const signalPaths = Array.isArray(message.signalPaths)
@@ -314,17 +358,7 @@ class SchematicEditorProvider {
           vscode.window.showInformationMessage('Install the ROHD extension for source navigation.');
         }
       } else if (message.type === 'reload') {
-        outputChannel.appendLine('[reload] Re-reading file from disk: ' + document.uri.fsPath);
-        try {
-          const content = await vscode.workspace.fs.readFile(document.uri);
-          const text = Buffer.from(content).toString('utf8');
-          const base64Data = Buffer.from(text, 'utf8').toString('base64');
-          webviewPanel.webview.postMessage({ type: 'schematicData', jsonBase64: base64Data });
-          outputChannel.appendLine('[reload] Sent updated schematic data, length=' + text.length);
-        } catch (e) {
-          outputChannel.appendLine('[reload] Error: ' + e.message);
-          webviewPanel.webview.postMessage({ type: 'reloadError', error: e.message });
-        }
+        await webviewPanel.webview.postMessage({ type: 'netlistFileChanged' });
       } else if (message.type === 'savePng') {
         // ── Save PNG with native file dialog ──
         const suggestedName = message.suggestedName || 'schematic.png';
@@ -421,7 +455,7 @@ class SchematicEditorProvider {
     });
   }
 
-  getFlutterHtmlForWebview(webview, documentUri, jsonContent) {
+  getFlutterHtmlForWebview(webview, documentUri) {
     const flutterWebPath = path.join(this._context.extensionPath, 'flutter_web');
     
     outputChannel.appendLine('Flutter renderer requested for: ' + documentUri.fsPath);
@@ -442,10 +476,8 @@ class SchematicEditorProvider {
     }
 
     const flutterUri = webview.asWebviewUri(vscode.Uri.file(flutterWebPath));
-    const jsonBase64 = Buffer.from(jsonContent, 'utf8').toString('base64');
     
     outputChannel.appendLine('Flutter URI: ' + flutterUri);
-    outputChannel.appendLine('JSON content length: ' + jsonContent.length + ' bytes');
     
     // Read the Flutter web index.html and modify it to inject the schematic data
     const indexPath = path.join(flutterWebPath, 'index.html');
@@ -462,12 +494,31 @@ class SchematicEditorProvider {
     // Remove X-UA-Compatible meta tag (not supported in webview)
     indexHtml = indexHtml.replace(/<meta[^>]*http-equiv="X-UA-Compatible"[^>]*>/gi, '');
     
-    // Inject the schematic JSON data as a global variable before Flutter loads.
+    // The webview requests bounded byte ranges; no netlist text enters HTML.
     const injectScript = `<script>
-      window.SCHEMATIC_JSON_BASE64 = "${jsonBase64}";
+      window.SCHEMATIC_INDEXED_FILE = true;
       window.VSCODE_WEBVIEW = true;
       window._vscodeApi = acquireVsCodeApi();
-      console.log('ROHD Schematic Viewer: Injected schematic data, length=' + window.SCHEMATIC_JSON_BASE64.length);
+      const pendingNetlistReads = new Map();
+      let nextNetlistRead = 0;
+      window.readSchematicFile = (start, length, revision) => new Promise(resolve => {
+        const requestId = ++nextNetlistRead;
+        const timer = setTimeout(() => {
+          pendingNetlistReads.delete(requestId);
+          resolve({ error: 'Timed out reading netlist from extension host' });
+        }, 30000);
+        pendingNetlistReads.set(requestId, { resolve, timer });
+        window._vscodeApi.postMessage({ type: 'netlistRead', requestId, start, length, revision });
+      });
+      window.addEventListener('message', event => {
+        const message = event.data;
+        if (!message || message.type !== 'netlistReadResult') return;
+        const pending = pendingNetlistReads.get(message.requestId);
+        if (!pending) return;
+        pendingNetlistReads.delete(message.requestId);
+        clearTimeout(pending.timer);
+        pending.resolve(message);
+      });
     </script>`;
     indexHtml = indexHtml.replace('</head>', injectScript + '\n</head>');
     

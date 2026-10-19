@@ -10,7 +10,84 @@
 import 'dart:convert';
 import 'dart:js_interop';
 
+import 'package:rohd_schematic_viewer/src/services/indexed_netlist_loader.dart';
 import 'package:web/web.dart' as web;
+
+@JS('window.SCHEMATIC_INDEXED_FILE')
+external JSBoolean? get _indexedFile;
+
+@JS('window.readSchematicFile')
+external JSPromise<JSObject> _readFileRange(
+  JSNumber start,
+  JSNumber length,
+  JSString? revision,
+);
+
+Future<JSObject> _requestFileRange(
+    int start, int length, String? revision) async {
+  final response =
+      await _readFileRange(start.toJS, length.toJS, revision?.toJS).toDart;
+  final error = response['error'];
+  if (error != null) {
+    throw FormatException('Failed to read netlist: ${error.dartify()}');
+  }
+  return response;
+}
+
+/// Opens the file owned by this webview without reading its contents.
+Future<NetlistByteSource?> openInjectedNetlistFile() async {
+  if (!(_indexedFile?.toDart ?? false)) {
+    return null;
+  }
+  final info = await _requestFileRange(0, 0, null);
+  return _ExtensionNetlistSource(
+    (info['size']! as JSNumber).toDartInt,
+    (info['revision']! as JSString).toDart,
+  );
+}
+
+class _ExtensionNetlistSource extends NetlistByteSource {
+  const _ExtensionNetlistSource(this.size, this.revision);
+
+  final int size;
+
+  @override
+  int get totalBytes => size;
+  final String revision;
+
+  @override
+  Stream<List<int>> openRead([int start = 0, int? end]) async* {
+    final limit = end ?? size;
+    if (start < 0 || limit < start || limit > size) {
+      throw RangeError('Invalid netlist byte range $start:$limit');
+    }
+    for (var offset = start; offset < limit;) {
+      final length = (limit - offset).clamp(0, 262144);
+      final response = await _requestFileRange(offset, length, revision);
+      final bytes = base64Decode((response['bytesBase64']! as JSString).toDart);
+      if (bytes.length != length) {
+        throw const FormatException('Netlist changed or was truncated; reload');
+      }
+      offset += bytes.length;
+      yield bytes;
+    }
+  }
+}
+
+/// Listens for a reload notification without transporting the file contents.
+void listenForIndexedFileReload(void Function() onReload) {
+  web.window.addEventListener(
+    'message',
+    ((web.MessageEvent event) {
+      final data = event.data;
+      if (data != null &&
+          ((data as JSObject)['type'] as JSString?)?.toDart ==
+              'netlistFileChanged') {
+        onReload();
+      }
+    }).toJS,
+  );
+}
 
 /// Dynamic property access on JSObject (same pattern as schematic_js_interop).
 extension _JSObjectProp on JSObject {

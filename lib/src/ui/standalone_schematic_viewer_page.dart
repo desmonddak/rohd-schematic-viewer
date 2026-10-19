@@ -87,27 +87,17 @@ class _StandaloneSchematicViewerPageState
         loadedFileName = 'Provided schematic';
       } else {
         // Evict any cached copy so we re-read the actual file from disk/server.
-        const assetKey = kIsWeb
-            ? _defaultSchematicFileName
-            : 'assets/$_defaultSchematicFileName';
+        const assetKey = 'assets/$_defaultSchematicFileName';
         rootBundle.evict(assetKey);
 
-        if (kIsWeb) {
-          // Check if running in VS Code webview with injected schematic.
-          final injectedJson = getInjectedSchematicJson();
-          if (injectedJson != null && injectedJson.isNotEmpty) {
-            jsonData = injectedJson;
-            loadedFileName = 'VS Code Schematic';
-          } else {
-            // On web, rootBundle prepends 'assets/' automatically.
-            jsonData = await rootBundle.loadString(_defaultSchematicFileName);
-            loadedFileName = _defaultSchematicFileName;
-          }
+        final injectedJson = kIsWeb ? getInjectedSchematicJson() : null;
+        if (injectedJson != null && injectedJson.isNotEmpty) {
+          jsonData = injectedJson;
+          loadedFileName = 'VS Code Schematic';
         } else {
-          // Desktop: full asset path required.
-          jsonData = await rootBundle.loadString(
-            'assets/$_defaultSchematicFileName',
-          );
+          // Bundle keys match pubspec on every platform. The web engine adds
+          // its deployment prefix, not the "assets/" portion of the key.
+          jsonData = await rootBundle.loadString(assetKey);
           loadedFileName = _defaultSchematicFileName;
         }
       }

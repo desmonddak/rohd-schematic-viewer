@@ -442,6 +442,207 @@ void main() {
     );
   });
 
+  test('synthesizes ported modules across rows and resolves scoped targets',
+      () {
+    final hierarchy = BaseHierarchyAdapter.fromTree(
+      HierarchyOccurrence(
+        name: 'top',
+        definition: 'Top',
+        signals: [
+          SignalOccurrence(
+            name: 'a_very_long_input_name',
+            width: 8,
+            direction: 'input',
+          ),
+          SignalOccurrence(name: 'output', width: 1, direction: 'output'),
+          SignalOccurrence(name: 'bidirectional', width: 1, direction: 'inout'),
+          SignalOccurrence(name: 'internal', width: 1),
+        ],
+        portCount: 3,
+        children: [
+          for (var index = 0; index < 4; index++)
+            HierarchyOccurrence(
+              name: 'u$index',
+              definition: 'Child',
+              children: [
+                HierarchyOccurrence(name: 'leaf', definition: 'Leaf'),
+              ],
+            ),
+        ],
+      ),
+    );
+    final synthesizer = HierarchySchematicSynthesizer(hierarchy);
+
+    final expanded = synthesizer.synthesize(expandedNodes: {'top/u0'});
+    expect(
+      expanded.instances.map((instance) => instance.id),
+      containsAll(
+          {'top', 'top/u0', 'top/u0/leaf', 'top/u1', 'top/u2', 'top/u3'}),
+    );
+    expect(
+      expanded.instances.singleWhere((instance) => instance.id == 'top').width,
+      greaterThan(120),
+    );
+    expect(
+      expanded.ports
+          .where((port) => port.instanceId == 'top')
+          .map((port) => (port.name, port.direction, port.side)),
+      containsAll([
+        ('a_very_long_input_name', 'INPUT', 'WEST'),
+        ('output', 'OUTPUT', 'EAST'),
+        ('bidirectional', 'INOUT', 'WEST'),
+      ]),
+    );
+    expect(
+      expanded.instances.singleWhere((instance) => instance.id == 'top/u3').y,
+      greaterThan(
+        expanded.instances.singleWhere((instance) => instance.id == 'top/u0').y,
+      ),
+    );
+
+    final scoped = synthesizer.synthesize(moduleId: 'top/u0');
+    expect(
+      scoped.instances.map((instance) => instance.id),
+      containsAll({'top/u0', 'top/u0/leaf'}),
+    );
+    expect(
+      synthesizer.synthesize(moduleId: 'not/a/module').instances,
+      isEmpty,
+    );
+  });
+
+  testWidgets(
+      'hierarchy viewer expands, switches scope, restores cache, and '
+      'passes cross-probe paths', (tester) async {
+    final hierarchy = _buildSelectionHierarchy();
+    final outgoing = <List<String>>[];
+    HierarchyOccurrence? selectedModule;
+    late StateSetter updateParent;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateParent = setState;
+            return EmbeddedSchematicViewer.fromHierarchy(
+              externalHierarchy: hierarchy,
+              selectedModule: selectedModule,
+              onSendSignals: outgoing.add,
+              hasExternalSignalListeners: true,
+            );
+          },
+        ),
+      ),
+    );
+
+    var canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u1',
+      ),
+    );
+    final expand = canvas.onNodeToggle!('top/u1');
+    await tester.pump();
+    await expand;
+    canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u1/firstLeaf',
+      ),
+    );
+    expect(
+      canvas.layout.instances.map((instance) => instance.id),
+      contains('top/u1/firstLeaf'),
+    );
+
+    canvas.onSendSignals!(['Top/result']);
+    expect(outgoing, [
+      ['Top/result'],
+    ]);
+
+    updateParent(() => selectedModule = hierarchy.root.children[0]);
+    await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u1/firstLeaf',
+      ),
+    );
+    updateParent(() => selectedModule = hierarchy.root.children[1]);
+    await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u2/secondLeaf',
+      ),
+    );
+
+    updateParent(() => selectedModule = hierarchy.root.children[0]);
+    canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u1/firstLeaf',
+      ),
+    );
+    expect(canvas.layout.instances, hasLength(2));
+    expect(find.text('Error'), findsNothing);
+  });
+
+  testWidgets(
+      'delivers an incoming cross-probe after its target scope is opened',
+      (tester) async {
+    final hierarchy = _buildSelectionHierarchy();
+    final incoming = ValueNotifier<List<String>?>(null);
+    addTearDown(incoming.dispose);
+    HierarchyOccurrence? selectedModule;
+    late StateSetter updateParent;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateParent = setState;
+            return EmbeddedSchematicViewer.fromHierarchy(
+              externalHierarchy: hierarchy,
+              selectedModule: selectedModule,
+              incomingSignalPaths: incoming,
+            );
+          },
+        ),
+      ),
+    );
+    await _pumpUntilCanvas(
+      tester,
+      (canvas) => canvas.layout.instances.any(
+        (instance) => instance.id == 'top/u1',
+      ),
+    );
+
+    incoming.value = ['top/u1/firstLeaf/result'];
+    await tester.pump();
+    var canvas = tester.widget<SchematicCanvas>(find.byType(SchematicCanvas));
+    expect(canvas.incomingSignalPaths?.value, isNull);
+
+    updateParent(() => selectedModule = hierarchy.root.children.first);
+    canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/u1/firstLeaf',
+      ),
+    );
+    expect(
+      canvas.incomingSignalPaths?.value,
+      ['top/u1/firstLeaf/result'],
+    );
+
+    incoming.value = ['top/u1/firstLeaf/nextResult'];
+    await tester.pump();
+    canvas = tester.widget<SchematicCanvas>(find.byType(SchematicCanvas));
+    expect(
+      canvas.incomingSignalPaths?.value,
+      ['top/u1/firstLeaf/nextResult'],
+    );
+    expect(find.text('Error'), findsNothing);
+  });
+
   testWidgets('fromHierarchy applies controlled expansion mode updates', (
     tester,
   ) async {
@@ -498,6 +699,100 @@ void main() {
     );
     expect(_instance(canvas, 'top').isExpanded, isTrue);
     expect(_instance(canvas, 'top/u1').isExpanded, isTrue);
+  });
+
+  testWidgets('fromHierarchy applies controlled theme and expansion changes',
+      (tester) async {
+    final hierarchy = _buildHierarchy();
+    var theme = SchematicThemeMode.dark;
+    var mode = SchematicExpansionMode.collapsed;
+    late StateSetter updateParent;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateParent = setState;
+            return EmbeddedSchematicViewer.fromHierarchy(
+              externalHierarchy: hierarchy,
+              themeMode: theme,
+              expansionMode: mode,
+            );
+          },
+        ),
+      ),
+    );
+    var canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.length == 1,
+    );
+    expect(_themeCubit(tester).state, SchematicThemeMode.dark);
+
+    updateParent(() {
+      theme = SchematicThemeMode.light;
+      mode = SchematicExpansionMode.fullyExpanded;
+    });
+    canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.length == 3,
+    );
+    expect(_themeCubit(tester).state, SchematicThemeMode.light);
+    expect(
+      canvas.layout.instances.map((instance) => instance.id),
+      containsAll({'top', 'top/u1', 'top/u1/leaf'}),
+    );
+  });
+
+  testWidgets('rebuilds the light layout when the external hierarchy changes',
+      (tester) async {
+    final first = _buildHierarchy();
+    final replacement = BaseHierarchyAdapter.fromTree(
+      HierarchyOccurrence(
+        name: 'top',
+        definition: 'Replacement',
+        children: [
+          HierarchyOccurrence(name: 'newBlock', definition: 'Block'),
+        ],
+      ),
+    );
+    var hierarchy = first;
+    late StateSetter updateParent;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateParent = setState;
+            return EmbeddedSchematicViewer.fromHierarchy(
+              externalHierarchy: hierarchy,
+              expansionMode: SchematicExpansionMode.fullyExpanded,
+            );
+          },
+        ),
+      ),
+    );
+    await _pumpUntilCanvas(
+      tester,
+      (canvas) => canvas.layout.instances.any(
+        (instance) => instance.id == 'top/u1',
+      ),
+    );
+
+    updateParent(() => hierarchy = replacement);
+    final canvas = await _pumpUntilCanvas(
+      tester,
+      (candidate) => candidate.layout.instances.any(
+        (instance) => instance.id == 'top/newBlock',
+      ),
+    );
+    expect(
+      canvas.layout.instances.map((instance) => instance.id),
+      containsAll({'top', 'top/newBlock'}),
+    );
+    expect(
+      canvas.layout.instances.map((instance) => instance.id),
+      isNot(contains('top/u1')),
+    );
   });
 
   testWidgets('fromHierarchy applies an initial selected module', (

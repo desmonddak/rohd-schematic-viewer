@@ -13,7 +13,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 import 'package:rohd_schematic_viewer/schematic_viewer.dart';
 
-const _exampleNetlist = r'''
+const exampleNetlist = r'''
 {
   "creator": "rohd_schematic_viewer example",
   "modules": {
@@ -81,7 +81,7 @@ class _ExampleApp extends StatelessWidget {
         home: Scaffold(
           appBar: AppBar(title: const Text('Embedded Schematic')),
           body: const EmbeddedSchematicViewer.fromJson(
-            schematicJson: _exampleNetlist,
+            schematicJson: exampleNetlist,
           ),
         ),
       );
