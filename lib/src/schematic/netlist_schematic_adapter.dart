@@ -73,9 +73,13 @@ class NetlistSchematicAdapter {
   });
 
   /// Parse a Yosys-compatible JSON netlist into hierarchy and schematic data.
+  ///
+  /// [strictBlocksOnly] keeps opaque module instances in the initial view
+  /// without falling back to showing primitives when no hierarchy is available.
   factory NetlistSchematicAdapter.fromJson(
     String netlistJson, {
     HierarchyService? externalHierarchy,
+    bool strictBlocksOnly = false,
   }) {
     final decoded = jsonDecode(netlistJson) as Map<String, dynamic>;
     final creator = _readMetadataString(decoded['creator']);
@@ -94,6 +98,7 @@ class NetlistSchematicAdapter {
     final builder = _SchematicBuilder(
       modules: modules,
       externalHierarchy: externalHierarchy,
+      strictBlocksOnly: strictBlocksOnly,
     );
     final result = builder.build(topName);
 
@@ -309,10 +314,15 @@ class _YosysOperator {
 }
 
 class _SchematicBuilder {
-  _SchematicBuilder({required this.modules, required this.externalHierarchy});
+  _SchematicBuilder({
+    required this.modules,
+    required this.externalHierarchy,
+    required this.strictBlocksOnly,
+  });
 
   final Map<String, _YosysModule> modules;
   final HierarchyService? externalHierarchy;
+  final bool strictBlocksOnly;
   final _SimpleHierarchyAdapter hierarchyAdapter = _SimpleHierarchyAdapter();
   final Map<String, LayoutNode> nodeMap = {};
 
@@ -352,7 +362,8 @@ class _SchematicBuilder {
       hierarchy: hierarchy,
     )..initNodeParents();
 
-    if (!graph.expandNonPrimitives(top.id, includeEdges: false)) {
+    if (!graph.expandNonPrimitives(top.id, includeEdges: false) &&
+        !strictBlocksOnly) {
       graph.toggleNode(top.id);
     }
 
@@ -382,7 +393,12 @@ class _SchematicBuilder {
     // "FilterChannel_T3_W16_0"), not by the cell's instance name (e.g.
     // "ch0"), so this must survive into the serialized layout.
     node.hwMeta = node.hwMeta.copyWith(
-      extra: {...?node.hwMeta.extra, 'definitionName': definitionName},
+      extra: {
+        ...?node.hwMeta.extra,
+        'definitionName': definitionName,
+        if (strictBlocksOnly && module.cells.isEmpty)
+          ElkLayoutMetadata.isBlackBox: true,
+      },
     );
 
     _addModulePorts(node: node, module: module, path: path);
@@ -430,10 +446,10 @@ class _SchematicBuilder {
   }) {
     final module = modules[cell.type];
     final translated = _YosysOperator.translate(cell.type, cell.parameters);
-    final primitive = cell.type.startsWith(r'$') ||
+    final isOperator = cell.type.startsWith(r'$') ||
         HierarchyOccurrence.isPrimitiveType(cell.type) ||
-        translated != null ||
-        module == null;
+        translated != null;
+    final primitive = isOperator || module == null;
     if (!primitive) {
       return _moduleNode(
         module: module,
@@ -443,7 +459,13 @@ class _SchematicBuilder {
         path: path,
       );
     }
-    return _primitiveNode(cell: cell, address: address, path: path);
+    final node = _primitiveNode(cell: cell, address: address, path: path);
+    if (strictBlocksOnly && !isOperator) {
+      node.hwMeta = node.hwMeta.copyWith(
+        extra: {...?node.hwMeta.extra, ElkLayoutMetadata.isBlackBox: true},
+      );
+    }
+    return node;
   }
 
   LayoutNode _primitiveNode({
@@ -564,7 +586,9 @@ class _SchematicBuilder {
       final direction = PortDirection.fromNetlist(entry.value);
       final displayName = _displayPortName(cell, portName);
       final side = _portSide(cell, portName, direction);
-      final width = cell.connections[portName]?.length ?? 1;
+      final width = cell.connections[portName]?.length ??
+          _asInt((cell.data['port_widths'] as Map?)?[portName]) ??
+          1;
       final layoutIndex = _layoutPortIndex(
         cell: cell,
         portName: portName,

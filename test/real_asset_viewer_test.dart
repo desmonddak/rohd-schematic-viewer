@@ -2304,6 +2304,80 @@ void main() {
     },
   );
 
+  testWidgets(
+    'shift-expanding then collapsing a FilterBank output restores hidden wires',
+    (tester) async {
+      final hostKey = GlobalKey<_AssetViewerHostState>();
+      final engine = _ProjectedLayoutEngine(hideInitialInteriorMarkers: true);
+
+      await tester.pumpWidget(
+        BlocProvider(
+          create: (_) => SchematicThemeCubit(),
+          child: MaterialApp(
+            home: _AssetViewerHost(
+              key: hostKey,
+              assetPath: 'assets/FilterBank.rohd.json',
+              engine: engine,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      var canvas = tester.widget<SchematicCanvas>(find.byType(SchematicCanvas));
+      final ch1 = engine.layouts.single.instances.firstWhere(
+        (instance) =>
+            instance.instanceName == 'ch1' ||
+            instance.name.split(' (').first == 'ch1',
+      );
+      final port = engine.layouts.single.ports.firstWhere(
+        (candidate) =>
+            candidate.instanceId == ch1.id &&
+            candidate.name == 'dataOut' &&
+            !engine.layouts.single.interiorHiddenPortIds
+                .contains(candidate.id) &&
+            engine.layouts.single.exteriorHiddenPortIds.contains(candidate.id),
+      );
+
+      final expand = canvas.onPortExpandThrough;
+      expect(expand, isNotNull);
+      final expanded = expand!(port.instanceId, port.id);
+      await tester.pump();
+      expect(await expanded, isNotNull);
+      await tester.pump();
+
+      canvas = tester.widget<SchematicCanvas>(find.byType(SchematicCanvas));
+      expect(canvas.onPortCollapseThrough, isNotNull);
+      final expandedLayout = engine.layouts.last;
+      final singleConnectionPort = expandedLayout.ports.firstWhere((candidate) {
+        final connectionCount = expandedLayout.edges
+            .where(
+              (edge) =>
+                  edge.sourcePort == candidate.id ||
+                  edge.targetPort == candidate.id,
+            )
+            .length;
+        return connectionCount == 1;
+      });
+      final collapse = hostKey.currentState!.collapsePortThrough(
+        singleConnectionPort.instanceId,
+        singleConnectionPort.id,
+      );
+      await tester.pump();
+      expect(await collapse, isNotNull);
+      await tester.pump();
+
+      expect(engine.layouts, hasLength(3));
+      expect(
+        engine.layouts.last.edges.length,
+        lessThan(expandedLayout.edges.length),
+      );
+      expect(hostKey.currentState!._isToggleIdle, isTrue);
+    },
+  );
+
   testWidgets('selects a FilterBank search result with batch expansion', (
     tester,
   ) async {

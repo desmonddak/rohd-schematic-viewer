@@ -7,7 +7,8 @@
 // 2026 January
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
-import 'dart:async' show Completer, TimeoutException, unawaited;
+import 'dart:async' show Completer, TimeoutException, Timer, unawaited;
+import 'dart:convert' show jsonEncode;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
@@ -28,6 +29,7 @@ import 'package:rohd_schematic_viewer/src/platform/platform_emoji.dart'
     as platform_emoji;
 import 'package:rohd_schematic_viewer/src/schematic/schematic.dart';
 import 'package:rohd_schematic_viewer/src/schematic/schematic_canvas.dart';
+import 'package:rohd_schematic_viewer/src/services/indexed_netlist_loader.dart';
 import 'package:rohd_schematic_viewer/src/services/schematic_layout_engine.dart';
 import 'package:rohd_schematic_viewer/src/services/schematic_layout_stub.dart'
     if (dart.library.js_interop) '../services/schematic_layout_web.dart'
@@ -46,6 +48,254 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   BaseSchematicViewerState();
 
   SchematicLayoutEngine? _layoutEngine;
+  IndexedNetlistLoader? _fileLoader;
+  NetlistByteSource? _fileSource;
+  final Set<String> _loadedFileModules = {};
+  int _fileGeneration = 0;
+  Stopwatch? _fileLoadClock;
+  Duration _fileLoadElapsed = Duration.zero;
+
+  void _traceFileLoad(String event) {
+    debugPrint('[FileLoad] #$_fileGeneration '
+        '+${_fileLoadClock?.elapsedMilliseconds ?? 0}ms $event');
+  }
+
+  void _setFileLoadPhase(String message, {bool log = true}) {
+    if (log) {
+      _traceFileLoad(message);
+    }
+    setState(() {
+      loadingMessage = message;
+      _fileLoadElapsed = _fileLoadClock?.elapsed ?? Duration.zero;
+    });
+  }
+
+  String _fileByteProgress(int bytes, int? total) =>
+      '${(bytes / 1000000).toStringAsFixed(1)}'
+      '${total == null ? '' : '/${(total / 1000000).toStringAsFixed(1)}'} MB';
+
+  /// Loads a file through a streaming hierarchy pass and per-module reads.
+  ///
+  /// This is intentionally separate from [computeLayout]: debugger-owned
+  /// hierarchy maps and fetch callbacks retain their existing loading path.
+  @protected
+  Future<void> loadIndexedFile(NetlistByteSource source) async {
+    if (!mounted) {
+      return;
+    }
+    final generation = ++_fileGeneration;
+    final clock = Stopwatch()..start();
+    _fileLoadClock = clock;
+    _fileLoadElapsed = Duration.zero;
+    setState(() {
+      isLoading = true;
+      loadingMessage = 'Indexing netlist...';
+      error = null;
+      isToggling = false;
+      pendingToggleNodeId = null;
+    });
+    _traceFileLoad(
+        'Starting hierarchy scan [bounded-reader-v2]; waiting for file bytes');
+    final heartbeat = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || generation != _fileGeneration) {
+        timer.cancel();
+        return;
+      }
+      _traceFileLoad('Still waiting: $loadingMessage; ${source.readStatus}');
+      setState(() {
+        _fileLoadElapsed = clock.elapsed;
+      });
+    });
+    var lastProgressLog = 0;
+    try {
+      final loader = await IndexedNetlistLoader.index(
+        source,
+        shouldContinue: () => mounted && generation == _fileGeneration,
+        onProgress: (bytesRead, modulesIndexed) {
+          if (mounted && generation == _fileGeneration) {
+            final log = clock.elapsedMilliseconds - lastProgressLog >= 1000;
+            _setFileLoadPhase(
+              'Indexing netlist: '
+              '${_fileByteProgress(bytesRead, source.totalBytes)}, '
+              '$modulesIndexed modules',
+              log: log,
+            );
+            if (log) {
+              lastProgressLog = clock.elapsedMilliseconds;
+            }
+          }
+        },
+      );
+      if (!mounted || generation != _fileGeneration) {
+        return;
+      }
+      _fileLoader = loader;
+      _fileSource = source;
+      _loadedFileModules.clear();
+      _traceFileLoad('Index ready: ${loader.moduleNames.length} modules');
+      _setFileLoadPhase('Encoding slim hierarchy...');
+      await WidgetsBinding.instance.endOfFrame
+          .timeout(const Duration(seconds: 10));
+      if (!mounted || generation != _fileGeneration) {
+        return;
+      }
+      await computeLayout(
+        jsonEncode(loader.hierarchyJson),
+        shouldCommit: () => generation == _fileGeneration,
+        preserveFileSource: true,
+      );
+    } on Exception catch (e) {
+      if (mounted && generation == _fileGeneration) {
+        setLoading(loading: false, errorMessage: 'Failed to load file: $e');
+      }
+    } finally {
+      heartbeat.cancel();
+      clock.stop();
+      if (mounted && generation == _fileGeneration) {
+        _traceFileLoad(error == null && !isLoading
+            ? 'Startup complete'
+            : 'Startup stopped; see error display');
+        _fileLoadClock = null;
+      }
+    }
+  }
+
+  Future<bool> _prepareFileConnectivity(
+    String nodeId, {
+    bool recursive = false,
+  }) async {
+    final loader = _fileLoader;
+    final adapter = schematicAdapter;
+    if (loader == null || adapter == null) {
+      return true;
+    }
+    final node = adapter.schematic.nodeMap[nodeId];
+    if (node == null) {
+      return true;
+    }
+    final definitions = <String>{};
+    void collect(LayoutNode current) {
+      final definition = current.definition;
+      if (definition != null &&
+          loader.moduleNames.contains(definition) &&
+          !_loadedFileModules.contains(definition)) {
+        definitions.add(definition);
+      }
+      if (recursive) {
+        current.children.forEach(collect);
+        current.hiddenChildren?.forEach(collect);
+      }
+    }
+
+    collect(node);
+    if (definitions.isEmpty) {
+      return true;
+    }
+    final generation = _fileGeneration;
+    setState(() {
+      isToggling = true;
+      togglingLabel = 'Loading connectivity...';
+      pendingToggleNodeId = nodeId;
+    });
+    final clock = Stopwatch()..start();
+    _fileLoadClock = clock;
+    _fileLoadElapsed = Duration.zero;
+    bool current() => mounted && generation == _fileGeneration;
+    Future<void> phase(String message) async {
+      if (!current()) {
+        return;
+      }
+      _traceFileLoad(message);
+      setState(() {
+        togglingLabel = message;
+      });
+      await WidgetsBinding.instance.endOfFrame
+          .timeout(const Duration(seconds: 10));
+    }
+
+    final heartbeat = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!current()) {
+        timer.cancel();
+        return;
+      }
+      _traceFileLoad('Still waiting: $togglingLabel; '
+          '${_fileSource?.readStatus ?? 'Waiting for connectivity'}');
+      setState(() {
+        _fileLoadElapsed = clock.elapsed;
+      });
+    });
+    try {
+      final updates = <String, dynamic>{};
+      var completed = 0;
+      for (final definition in definitions) {
+        final count = '${completed + 1}/${definitions.length}';
+        await phase('Loading connectivity ($count)...');
+        if (!current()) {
+          return false;
+        }
+        updates.addAll(await loader.fetchModuleNetlist(
+          definition,
+          onProgress: (bytes, total) {
+            if (current()) {
+              setState(() {
+                togglingLabel = 'Loading connectivity ($count): '
+                    '${_fileByteProgress(bytes, total)}';
+              });
+            }
+          },
+          beforeDecode: () => phase('Decoding connectivity ($count)...'),
+        ));
+        completed++;
+        if (!mounted || generation != _fileGeneration) {
+          return false;
+        }
+      }
+      if (!mounted || generation != _fileGeneration) {
+        return false;
+      }
+      final modules = loader.hierarchyJson['modules'] as Map<String, dynamic>;
+      final enriched = {
+        ...loader.hierarchyJson,
+        'modules': {...modules, ...updates},
+      };
+      final snapshot = adapter.schematic.expansionSnapshot();
+      await phase('Preparing hierarchy with connectivity...');
+      if (!current()) {
+        return false;
+      }
+      final json = jsonEncode(enriched);
+      await phase('Building hierarchy with connectivity...');
+      if (!current()) {
+        return false;
+      }
+      final rebuilt =
+          NetlistSchematicAdapter.fromJson(json, strictBlocksOnly: true);
+      rebuilt.schematic.restoreExpansionSnapshot(snapshot);
+      schematicAdapter = rebuilt;
+      schematicJson = json;
+      modules.addAll(updates);
+      _loadedFileModules.addAll(definitions);
+      return true;
+    } on Exception catch (e) {
+      if (mounted && generation == _fileGeneration) {
+        setLoading(
+          loading: false,
+          errorMessage: 'Failed to load connectivity: $e',
+        );
+      }
+      return false;
+    } finally {
+      heartbeat.cancel();
+      clock.stop();
+      if (mounted && generation == _fileGeneration) {
+        _fileLoadClock = null;
+        setState(() {
+          isToggling = false;
+          pendingToggleNodeId = null;
+        });
+      }
+    }
+  }
 
   /// Dart schematic adapter (owns the graph in Dart).
   /// Handles parsing and toggle operations.
@@ -83,6 +333,10 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
 
   /// Loading state.
   bool isLoading = true;
+
+  /// Current phase of a file-backed initial load.
+  @protected
+  String loadingMessage = 'Loading schematic...';
   @protected
 
   /// Toggling state.
@@ -234,6 +488,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
 
   @override
   void dispose() {
+    _fileGeneration++;
     _layoutEngine?.dispose();
     super.dispose();
   }
@@ -270,6 +525,7 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         ),
       )
       ..add(StringProperty('sessionId', sessionId))
+      ..add(StringProperty('loadingMessage', loadingMessage))
       ..add(StringProperty('togglingLabel', togglingLabel))
       ..add(
         ObjectFlagProperty<
@@ -325,6 +581,13 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   /// disk via VS Code extension messaging). Default re-processes the current
   /// in-memory JSON.
   void handleReload() {
+    final source = _fileSource;
+    if (source != null) {
+      unawaited(loadIndexedFile(source is FileNetlistByteSource
+          ? FileNetlistByteSource(source.file)
+          : source));
+      return;
+    }
     if (schematicJson != null) {
       unawaited(computeLayout(schematicJson!));
     }
@@ -346,7 +609,14 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     bool expandAll = false,
     SchematicExpansionMode? expansionMode,
     bool Function()? shouldCommit,
+    bool preserveFileSource = false,
   }) async {
+    if (!preserveFileSource && _fileLoader != null) {
+      _fileGeneration++;
+      _fileLoader = null;
+      _fileSource = null;
+      _loadedFileModules.clear();
+    }
     bool requestIsCurrent() =>
         mounted && (shouldCommit == null || shouldCommit());
 
@@ -375,11 +645,17 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       // Yield a frame so the loading indicator can render before
       // the heavy synchronous parse + serialization work begins.
       if (mounted) {
-        final completer = Completer<void>();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          completer.complete();
-        });
-        await completer.future;
+        if (preserveFileSource) {
+          _setFileLoadPhase('Building hierarchy...');
+          await WidgetsBinding.instance.endOfFrame
+              .timeout(const Duration(seconds: 10));
+        } else {
+          final completer = Completer<void>();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            completer.complete();
+          });
+          await completer.future;
+        }
         if (!requestIsCurrent()) {
           return;
         }
@@ -393,9 +669,19 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       final parseStart = DateTime.now();
 
       // Parse netlist JSON with the unified adapter
-      final parsedAdapter = NetlistSchematicAdapter.fromJson(jsonData);
+      if (preserveFileSource) {
+        _traceFileLoad('Building hierarchy...');
+      }
+      final parsedAdapter = NetlistSchematicAdapter.fromJson(
+        jsonData,
+        strictBlocksOnly: preserveFileSource,
+      );
 
       final parseEnd = DateTime.now();
+      if (preserveFileSource) {
+        _traceFileLoad('Hierarchy ready: '
+            '${parsedAdapter.schematic.nodeMap.length} nodes');
+      }
       if (kPerfLog) {
         debugPrint(
           '[PERF] NetlistSchematicAdapter.fromJson: '
@@ -417,6 +703,14 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
 
       // Serialize to JS format and compute layout with timeout.
       // The active ELK projection handles collapsed and partial expansion.
+      if (preserveFileSource) {
+        _setFileLoadPhase('Preparing initial layout...');
+        await WidgetsBinding.instance.endOfFrame
+            .timeout(const Duration(seconds: 10));
+        if (!requestIsCurrent()) {
+          return;
+        }
+      }
       final jsStart = DateTime.now();
       final elkGraph = parsedAdapter.schematic.toActiveJsGraph();
       final jsEnd = DateTime.now();
@@ -431,13 +725,28 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       // QuickJS (used on Linux native) is significantly slower than
       // browser JS engines, so allow generous time for ELK layout.
       final elkStart = DateTime.now();
+      if (preserveFileSource) {
+        _traceFileLoad('ELK projection ready: ${elkGraph.length} characters');
+        _setFileLoadPhase('Computing initial layout...');
+        await WidgetsBinding.instance.endOfFrame
+            .timeout(const Duration(seconds: 10));
+        if (!requestIsCurrent()) {
+          return;
+        }
+      }
       if (kPerfLog) {
         debugPrint('[PERF] Starting ELK layout...');
+      }
+      if (preserveFileSource) {
+        _traceFileLoad('Calling layout engine; waiting for result');
       }
       layoutResult = await engine
           .computeLayoutFromElkGraph(elkGraph, sessionId: _sessionId)
           .timeout(const Duration(seconds: 60));
       final elkEnd = DateTime.now();
+      if (preserveFileSource) {
+        _traceFileLoad('Layout engine returned');
+      }
       if (kPerfLog) {
         debugPrint(
           '[PERF] ELK layout: ${elkEnd.difference(elkStart).inMilliseconds} ms',
@@ -455,6 +764,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
           error = 'Layout error: ${layoutResult.error}';
           isLoading = false;
         });
+        if (preserveFileSource) {
+          _traceFileLoad('Layout engine reported an error');
+        }
         return;
       }
       setState(() {
@@ -464,12 +776,17 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
         error = null;
         isLoading = false;
       });
+      if (preserveFileSource) {
+        _traceFileLoad('Layout committed to viewer');
+      }
     } on TimeoutException catch (e) {
       if (!requestIsCurrent()) {
         return;
       }
       setState(() {
-        error = 'Schematic layout timed out (module too complex): $e';
+        error = preserveFileSource
+            ? 'File loading timed out while $loadingMessage: $e'
+            : 'Schematic layout timed out (module too complex): $e';
         isLoading = false;
       });
     } on Exception catch (e) {
@@ -573,6 +890,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   /// Uses either Dart-first or JS-first toggle based on `useDartFirstParsing`.
   Future<SchematicLayoutResult?> handleNodeToggle(String nodeId) async {
     if (isToggling) {
+      return null;
+    }
+    if (_fileLoader != null && !await _prepareFileConnectivity(nodeId)) {
       return null;
     }
     final engine = _layoutEngine;
@@ -787,6 +1107,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     if (isToggling) {
       return null;
     }
+    if (_fileLoader != null && !await _prepareFileConnectivity(nodeId)) {
+      return null;
+    }
     final engine = _layoutEngine;
     if (engine == null || schematicAdapter == null) {
       return null;
@@ -890,6 +1213,10 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     String portId,
   ) async {
     if (isToggling) {
+      return null;
+    }
+    if (_fileLoader != null &&
+        !await _prepareFileConnectivity(nodeId, recursive: true)) {
       return null;
     }
     final engine = _layoutEngine;
@@ -1651,6 +1978,10 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     if (isToggling) {
       return null;
     }
+    if (_fileLoader != null &&
+        !await _prepareFileConnectivity(nodeId, recursive: true)) {
+      return null;
+    }
     final engine = _layoutEngine;
     if (engine == null || schematicAdapter == null) {
       return null;
@@ -1909,6 +2240,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     if (isToggling) {
       return null;
     }
+    if (_fileLoader != null && !await _prepareFileConnectivity(nodeId)) {
+      return null;
+    }
     final engine = _layoutEngine;
     if (engine == null || schematicAdapter == null) {
       return null;
@@ -2000,6 +2334,13 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   }) async {
     if (isToggling || pathSegments.isEmpty) {
       return null;
+    }
+    if (_fileLoader != null && targetWireName != null) {
+      final nodeId =
+          schematicAdapter?.schematic.resolvePathToNodeId(pathSegments);
+      if (nodeId != null && !await _prepareFileConnectivity(nodeId)) {
+        return null;
+      }
     }
     final engine = _layoutEngine;
     if (engine == null || schematicAdapter == null) {
@@ -2095,6 +2436,9 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
     String wireName,
   ) async {
     if (isToggling) {
+      return null;
+    }
+    if (_fileLoader != null && !await _prepareFileConnectivity(nodeId)) {
       return null;
     }
     final engine = _layoutEngine;
@@ -2244,15 +2588,8 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
       if (kPerfLog) {
         debugPrint('[PERF] loadSchematicFromFile: reading ${xfile.name}...');
       }
-      final jsonData = await xfile.readAsString();
-      if (kPerfLog) {
-        debugPrint(
-          '[PERF] loadSchematicFromFile: read ${jsonData.length} chars, '
-          'calling computeLayout...',
-        );
-      }
       setFileName(xfile.name);
-      await computeLayout(jsonData);
+      await loadIndexedFile(FileNetlistByteSource(xfile));
     } on Exception catch (e) {
       if (kPerfLog) {
         debugPrint('[PERF] loadSchematicFromFile: EXCEPTION: $e');
@@ -2445,17 +2782,21 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          color: spinnerColor,
-                          strokeWidth: 2,
+                      if (_fileLoader == null)
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            color: spinnerColor,
+                            strokeWidth: 2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                      if (_fileLoader == null) const SizedBox(width: 8),
                       Text(
-                        togglingLabel,
+                        togglingLabel +
+                            (_fileLoadClock == null
+                                ? ''
+                                : '\nElapsed: ${_fileLoadElapsed.inSeconds}s'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: textColor,
                               fontWeight: FontWeight.w500,
@@ -2484,14 +2825,21 @@ abstract class BaseSchematicViewerState<T extends StatefulWidget>
   }
 
   /// Build standard loading indicator.
-  Widget buildLoadingIndicator({String message = 'Loading schematic...'}) =>
-      Center(
+  Widget buildLoadingIndicator({String? message}) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: Colors.white54),
-            const SizedBox(height: 16),
-            Text(message, style: const TextStyle(color: Colors.white70)),
+            if (_fileLoadClock == null) ...[
+              const CircularProgressIndicator(color: Colors.white54),
+              const SizedBox(height: 16),
+            ],
+            Text(
+                message ??
+                    (loadingMessage +
+                        (_fileLoadClock == null
+                            ? ''
+                            : '\nElapsed: ${_fileLoadElapsed.inSeconds}s')),
+                style: const TextStyle(color: Colors.white70)),
           ],
         ),
       );

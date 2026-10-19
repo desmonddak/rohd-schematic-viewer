@@ -81,6 +81,68 @@ The JSON must use the Yosys-compatible netlist structure described below.
 See the complete runnable [widget example](example/main.dart) for a minimal
 application and netlist.
 
+## Loading Large Netlist Files
+
+Files opened with the standalone file picker or the VS Code custom editor
+are indexed directly from disk in bounded byte ranges. The initial scan
+retains a slim hierarchy (module and signal names, pins, widths, attributes,
+and source metadata), not cell connection arrays or the complete JSON text.
+This follows ROHD's slim-netlist/per-module-connectivity split.
+
+The initial layout shows child blocks without loading connectivity, including
+at the root. An operation that needs wires reads and decodes only the relevant
+module's byte range; recursive wire expansion reads the needed descendants.
+Blocks-only expansion does not load connectivity. Already loaded module
+definitions are reused. VS Code requests bounded ranges from its extension
+host instead of embedding the entire file as base64 in the webview.
+
+Opaque module instances (empty or missing module definitions) remain visible
+as blocks, while primitive constants and selects stay hidden until requested.
+Only blocks with internal cells in the netlist offer deeper expansion; an
+undefined module cannot be expanded into hierarchy absent from the file.
+
+File startup reports bytes scanned and modules indexed, followed by hierarchy
+construction, frame waits, and initial-layout phases. Console messages prefixed
+with `[FileLoad]` (including a load ID and elapsed time) mark each checkpoint;
+while an asynchronous step is pending, a heartbeat repeats the current phase
+every five seconds. These messages omit design names and JSON contents.
+Frame waits time out explicitly instead of leaving a spinner indefinitely.
+Browser files use verified Blob-URL range requests, avoiding `XFile`'s
+whole-Blob retrieval before slicing. Browser reads are capped at 1 MiB to
+amortize request overhead; native reads remain capped at 64 KiB. Metadata and
+byte-read waits time out with a visible error rather than waiting indefinitely.
+Native read cancellation has its own deadline so stalled cleanup cannot hide
+the read timeout.
+File loading shows MB scanned/total and a separate hierarchy-building phase.
+Opening file-backed blocks shows connectivity read progress, decoding, and
+hierarchy rebuilding before layout. These stages use text instead of relying
+on a spinner that cannot animate during synchronous conversion.
+The startup marker `[bounded-reader-v2]` identifies the updated loader, and
+heartbeats include its current I/O phase and byte range. Start a fresh file load
+after updating: hot reload cannot replace an already pending asynchronous read.
+A browser is not needed to test the startup loading path:
+run `flutter test test/indexed_file_viewer_test.dart`.
+To profile a local file without adding it as a test fixture, set the environment
+variable `NETLIST_TEST_FILE=/absolute/path/to/netlist.json` and pass
+`--plain-name="disk startup completes hierarchy-only before calling layout"`.
+This test uses the real file-backed startup entry point and substitutes only
+the layout engine; it checks that startup finishes without connectivity reads.
+
+The browser byte source and indexer can also be tested without the Flutter
+viewer: run `dart test --platform chrome --compiler dart2wasm
+test/browser_indexed_netlist_loader_test.dart` (or use `dart2js`). These tests
+use synthetic Blob files and verify bounded reads and on-demand connectivity.
+
+The index is session-local. Reload rescans the file; if a file changes while
+being viewed, further disk reads report an error rather than using stale
+offsets. VS Code requires a filesystem-backed file (including a remote
+workspace file served by the remote extension host).
+
+The initial scan still traverses the entire file, and the complete slim
+hierarchy and named-signal metadata remain in memory. Hierarchy-by-depth
+loading is not implemented. Explicit JSON strings/maps, bundled assets, and
+the debugger's existing hierarchy and connectivity callbacks are unchanged.
+
 ## Generate a Netlist Directly with ROHD
 
 ROHD Schematic Viewer requires a netlist in the

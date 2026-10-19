@@ -1,5 +1,7 @@
 ## 0.2.5
 
+- Add hierarchy-first indexed loading for standalone and VS Code netlist files, using bounded reads instead of buffering the whole file and fetching connectivity on demand. Start with child blocks only, preserve opaque blocks and expansion controls, and leave debugger loading unchanged.
+- Show MB loaded/total and explicit loading, hierarchy-building, and connectivity stages. Improve scan performance, detect file changes, and bound read and cancellation waits to avoid indefinite loading. Cover native, Wasm, and JavaScript loading with regression tests.
 - Broaden the hierarchy dependency constraint to accept 0.1.x and 0.2.x and the DevTools widgets constraint to accept 0.1.1 through 0.2.x without requiring the new widgets release first.
 - Accept ROHD 0.6.11 and 0.7.x.
 - Narrow the ROHD import to `LogicValue` so analysis also accepts ROHD versions without the deprecated `Port` alias.
@@ -7,8 +9,7 @@
 
 ## 0.2.4
 
-- Use a PNG coverage badge in the shared README so Marketplace packaging
-  accepts the badge while GitHub continues to display it.
+- Use a PNG coverage badge in the shared README so Marketplace packaging accepts the badge while GitHub continues to display it.
 
 ## 0.2.3
 
@@ -16,22 +17,17 @@
 
 ## 0.2.2
 
-- Fixed Wasm startup in VS Code by disabling browser history for both web
-  compilers before widget initialization.
+- Fixed Wasm startup in VS Code by disabling browser history for both web compilers before widget initialization.
 
-- Restored missing COMBINATIONAL and SEQUENTIAL input/output port labels,
-  drawing them in white over the original solid blue fill.
+- Restored missing COMBINATIONAL and SEQUENTIAL input/output port labels, drawing them in white over the original solid blue fill.
 
-- Added standard Intel VSIX packaging with Wasm and JavaScript fallback,
-  packaged-runtime smoke tests, and verified GitHub artifacts for manual
-  Marketplace publication.
+- Added standard Intel VSIX packaging with Wasm and JavaScript fallback, packaged-runtime smoke tests, and verified GitHub artifacts for manual Marketplace publication.
 
 ## 0.2.1
 
 - Added an App Bar settings menu with a **Display widths** control for showing or hiding blue multi-bit signal-width overlays without recomputing the schematic layout.
 
-- Prevented large PNG exports from clipping the visible schematic by reducing output raster resolution as needed while preserving the complete current
-  viewport.
+- Prevented large PNG exports from clipping the visible schematic by reducing output raster resolution as needed while preserving the complete current viewport.
 
 ## 0.2.0
 

@@ -7,6 +7,14 @@
 // 2026 January
 // Author: Desmond Kirkpatrick <desmond.a.kirkpatrick@intel.com>
 
+import 'package:rohd_schematic_viewer/src/services/indexed_netlist_loader.dart';
+
+/// No extension-backed byte source on native platforms.
+Future<NetlistByteSource?> openInjectedNetlistFile() async => null;
+
+/// No indexed-file notifications on native platforms.
+void listenForIndexedFileReload(void Function() onReload) {}
+
 /// Returns null on non-web platforms (no injected schematic).
 String? getInjectedSchematicJson() => null;
 

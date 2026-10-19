@@ -42,12 +42,15 @@ function loadModule(filename, vscode) {
   return module.exports;
 }
 
-function webviewHtml(extensionDirectory, resourceOrigin) {
+async function webviewHtml(extensionDirectory, resourceOrigin) {
   let provider;
   const disposable = { dispose() {} };
   const vscode = {
-    Uri: { file: fsPath => ({ fsPath }) },
-    commands: { registerCommand: () => disposable },
+    Uri: { file: fsPath => ({ fsPath, scheme: 'file' }) },
+    commands: {
+      registerCommand: () => disposable,
+      executeCommand: async () => [],
+    },
     window: {
       createOutputChannel: () => ({ appendLine() {} }),
       registerCustomEditorProvider: (_id, registeredProvider) => {
@@ -60,13 +63,28 @@ function webviewHtml(extensionDirectory, resourceOrigin) {
   extension.activate({ extensionPath: extensionDirectory, subscriptions: [] });
   assert.ok(provider, 'The packaged extension must register its custom editor');
   const fixture = path.join(extensionDirectory, 'assets', 'rohd_schematic.json');
-  return provider.getFlutterHtmlForWebview({
+  let receive;
+  const replies = [];
+  const webview = {
     cspSource: resourceOrigin,
     asWebviewUri: uri => new URL(
       path.relative(extensionDirectory, uri.fsPath).split(path.sep).join('/'),
       `${resourceOrigin}/`,
     ).href,
-  }, vscode.Uri.file(fixture), fs.readFileSync(fixture, 'utf8'));
+    postMessage: async message => { replies.push(message); return true; },
+    onDidReceiveMessage: callback => { receive = callback; return disposable; },
+  };
+  await provider.resolveCustomEditor(
+    { uri: vscode.Uri.file(fixture) },
+    { webview, onDidDispose: () => disposable },
+  );
+  return {
+    html: webview.html,
+    receive: async message => {
+      await receive(message);
+      return replies.splice(0);
+    },
+  };
 }
 
 async function listen(server) {
@@ -109,7 +127,17 @@ async function exerciseRuntime(browser, documentOrigin, javascriptFallback) {
       };
       window.addEventListener('flutter-first-frame', () => state.firstFrame = true);
       window.acquireVsCodeApi = () => ({
-        postMessage() {},
+        postMessage(message) {
+          fetch(new URL('/extension', document.querySelector('base').href), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(message),
+          }).then(response => response.json()).then(replies => {
+            for (const data of replies) {
+              window.dispatchEvent(new MessageEvent('message', { data }));
+            }
+          }).catch(error => console.error('Extension bridge failed', error));
+        },
         getState() { return null; },
         setState(value) { return value; },
       });
@@ -194,7 +222,27 @@ async function main() {
       '.otf': 'font/otf',
     };
     let documentOrigin;
-    const resources = http.createServer((request, response) => {
+    let host;
+    const resources = http.createServer(async (request, response) => {
+      if (request.url === '/extension' && request.method === 'POST') {
+        try {
+          let body = '';
+          for await (const chunk of request) {
+            body += chunk;
+            if (body.length > 4096) throw new Error('Oversized extension request');
+          }
+          const replies = await host.receive(JSON.parse(body));
+          response.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': documentOrigin,
+          });
+          response.end(JSON.stringify(replies));
+        } catch (error) {
+          response.writeHead(500);
+          response.end(String(error));
+        }
+        return;
+      }
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
       const filename = path.resolve(extensionDirectory, `.${pathname}`);
       if (!filename.startsWith(`${extensionDirectory}${path.sep}`) ||
@@ -211,10 +259,10 @@ async function main() {
     });
     servers.push(resources);
     const resourceOrigin = await listen(resources);
-    const html = webviewHtml(extensionDirectory, resourceOrigin);
+    host = await webviewHtml(extensionDirectory, resourceOrigin);
     const document = http.createServer((_request, response) => {
       response.writeHead(200, { 'Content-Type': 'text/html' });
-      response.end(html);
+      response.end(host.html);
     });
     servers.push(document);
     documentOrigin = await listen(document);
