@@ -297,8 +297,8 @@ class _FlutterSchematicViewerPageState
           final f = frames.first;
           client.openSourceLocation(
             file: f['file'] as String? ?? '',
-            line: f['line'] as int? ?? 0,
-            col: f['col'] as int? ?? 0,
+            line: (f['line'] as num?)?.toInt() ?? 0,
+            col: (f['col'] as num?)?.toInt() ?? 0,
           );
         } else {
           // Multiple frames — show selection popup.
@@ -360,7 +360,7 @@ class _FlutterSchematicViewerPageState
     for (var i = 0; i < frames.length; i++) {
       final f = frames[i];
       final file = (f['file'] as String? ?? '').split('/').last;
-      final line = f['line'] as int? ?? 0;
+      final line = (f['line'] as num?)?.toInt() ?? 0;
       final desc = f['desc'] as String? ?? '';
       final type = f['type'] as String? ?? '';
       final label = desc.isNotEmpty
@@ -399,8 +399,8 @@ class _FlutterSchematicViewerPageState
         final f = frames[idx];
         _extensionClient?.openSourceLocation(
           file: f['file'] as String? ?? '',
-          line: f['line'] as int? ?? 0,
-          col: f['col'] as int? ?? 0,
+          line: (f['line'] as num?)?.toInt() ?? 0,
+          col: (f['col'] as num?)?.toInt() ?? 0,
         );
       }),
     );

@@ -22,14 +22,15 @@
 ROOT := $(abspath $(CURDIR))
 FLUTTER ?= flutter
 NODE ?= node
+NPM ?= npm
 
 # Source file patterns for dependency tracking
 DART_SOURCES := $(shell find $(ROOT)/lib -name '*.dart' 2>/dev/null)
 JS_BRIDGE_SOURCES := $(shell find $(ROOT)/js_bridge -name '*.js' 2>/dev/null)
 JS_ASSETS := $(shell find $(ROOT)/assets/js -type f 2>/dev/null)
 
-# Source of truth: extract version from pubspec.yaml
-PUBSPEC_VERSION := $(shell grep '^version:' $(ROOT)/pubspec.yaml | head -1 | sed 's/version: *//' | sed 's/+.*//')
+# The root Pub package and VSIX share one release version.
+PUBSPEC_VERSION := $(shell awk '$$1 == "version:" { print $$2; exit }' "$(ROOT)/pubspec.yaml")
 
 # Read name from package.json; version comes from pubspec.yaml
 PKG_NAME := $(shell $(NODE) -p "require('./package.json').name")
@@ -39,7 +40,7 @@ VSCE ?= npx --yes @vscode/vsce@$(VSCE_VERSION)
 EXT_STAGE := $(ROOT)/build/extension/$(PKG_NAME)-$(PKG_VERSION)
 VSIX := $(ROOT)/build/$(PKG_NAME)-$(PKG_VERSION).vsix
 
-.PHONY: all help build extension vsix package stage-extension verify-vsix test-vsix test-web clean real-clean install-local install-remote install web web-debug web-release linux linux-debug linux-release web-run web-serve linux-run-debug linux-run-profile linux-run-release clean-extension clean-web clean-linux force test coverage coverage-view coverage-clean coverity coverity-setup coverity-clean sync-version verify-elk-distribution
+.PHONY: all help build extension vsix package stage-extension verify-extension-version verify-vsix test-vsix test-web clean real-clean install-local install-remote install web web-debug web-release linux linux-debug linux-release web-run web-serve linux-run-debug linux-run-profile linux-run-release clean-extension clean-web clean-linux force test coverage coverage-view coverage-clean coverity coverity-setup coverity-clean sync-version verify-elk-distribution
 
 help:
 	@echo "ROHD Schematic Visualizer Extension - Build Targets"
@@ -48,6 +49,7 @@ help:
 	@echo "  all              - Build the Marketplace-ready VSIX (default target)"
 	@echo "  extension        - Build Marketplace-ready VSIX"
 	@echo "  vsix             - Build Marketplace-ready VSIX"
+	@echo "  verify-extension-version - Verify Pub and VS Code extension versions match"
 	@echo "  verify-vsix      - Verify the existing VSIX without rebuilding"
 	@echo "  test-vsix        - Smoke-test both runtimes in the existing VSIX"
 	@echo "  build            - (alias for extension)"
@@ -87,7 +89,7 @@ help:
 	@echo "  coverage         - Generate Dart LCOV and HTML coverage reports"
 	@echo "  coverage-view    - Serve coverage/html locally on port 8000"
 	@echo "  coverity         - Run configured Coverity scan workflow"
-	@echo "  sync-version     - Sync pubspec.yaml version → package.json"
+	@echo "  sync-version     - Sync extension manifests to pubspec.yaml"
 	@echo "  force            - Clean everything and rebuild from scratch"
 	@echo ""
 
@@ -310,7 +312,7 @@ clean-linux:
 
 # Curated extension staging directory. Keep VSIX creation separate so vsce
 # controls the standard Marketplace archive layout.
-$(EXT_STAGE)/package.json: sync-version stage-js build/web/index.html scripts/build_extension.sh scripts/copy_devtools_extension_assets.cjs LICENSE CODE_OF_CONDUCT.md THIRD_PARTY_NOTICES.md
+$(EXT_STAGE)/package.json: stage-js build/web/index.html scripts/build_extension.sh scripts/copy_devtools_extension_assets.cjs LICENSE CODE_OF_CONDUCT.md THIRD_PARTY_NOTICES.md | verify-extension-version
 	@echo "Staging extension files..."
 	@EXT_STAGE="$(EXT_STAGE)" sh scripts/build_extension.sh
 
@@ -322,7 +324,7 @@ $(VSIX): $(EXT_STAGE)/package.json scripts/verify_extension_vsix.sh
 	@mkdir -p $(dir $@)
 	@cd "$(EXT_STAGE)" && $(VSCE) package --no-dependencies --out "$@"
 
-verify-vsix:
+verify-vsix: verify-extension-version
 	@bash scripts/verify_extension_vsix.sh "$(VSIX)"
 
 # Alias: build target for convenience
@@ -356,19 +358,32 @@ install-remote: extension
 install: install-remote
 
 # ---------------------------------------------------------------------------
-# Version sync  (pubspec.yaml → package.json)
+# Version alignment  (pubspec.yaml → package.json/package-lock.json)
 # ---------------------------------------------------------------------------
 sync-version:
-	@echo "Syncing version $(PUBSPEC_VERSION) from pubspec.yaml → package.json..."
-	@if command -v $(NODE) >/dev/null 2>&1; then \
-		$(NODE) -e " \
-			const fs = require('fs'); \
-			const f = '$(ROOT)/package.json'; \
-			const pkg = JSON.parse(fs.readFileSync(f,'utf8')); \
-			pkg.version = '$(PUBSPEC_VERSION)'; \
-			fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');" ; \
-		echo "  package.json → $(PUBSPEC_VERSION)"; \
-	else \
-		echo "error: Node.js is required to synchronize extension versions."; \
+	@if [ -z "$(PUBSPEC_VERSION)" ]; then \
+		echo "error: Unable to read version from pubspec.yaml."; \
 		exit 1; \
 	fi
+	@cd "$(ROOT)" && $(NPM) version "$(PUBSPEC_VERSION)" --no-git-tag-version --allow-same-version
+	@echo "Synchronized VS Code extension version $(PUBSPEC_VERSION) from pubspec.yaml."
+
+verify-extension-version:
+	@pubspec_version="$(PUBSPEC_VERSION)"; \
+	manifest_version="$$($(NODE) -p "require('$(ROOT)/package.json').version")"; \
+	lock_version="$$($(NODE) -p "require('$(ROOT)/package-lock.json').version")"; \
+	lock_root_version="$$($(NODE) -p "require('$(ROOT)/package-lock.json').packages[''].version")"; \
+	if [ -z "$$pubspec_version" ]; then \
+		echo "error: Unable to read version from pubspec.yaml."; \
+		exit 1; \
+	elif [ "$$pubspec_version" != "$$manifest_version" ] || \
+	   [ "$$pubspec_version" != "$$lock_version" ] || \
+	   [ "$$pubspec_version" != "$$lock_root_version" ]; then \
+		echo "error: Pub and VS Code extension versions do not match."; \
+		echo "  pubspec.yaml:               $$pubspec_version"; \
+		echo "  package.json:              $$manifest_version"; \
+		echo "  package-lock.json:         $$lock_version"; \
+		echo "  package-lock.json root:    $$lock_root_version"; \
+		exit 1; \
+	fi; \
+	echo "Pub package and VS Code extension version $$pubspec_version verified."

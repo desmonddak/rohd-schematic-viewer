@@ -216,7 +216,7 @@ void main() {
     final host = _FakeExtensionHost();
     final client = _FakeExtensionClient()
       ..frames = [
-        {'file': '/workspace/filter_bank.dart', 'line': 42, 'col': 3},
+        {'file': '/workspace/filter_bank.dart', 'line': 42.0, 'col': 3.0},
       ];
 
     await tester.pumpWidget(
@@ -280,8 +280,8 @@ void main() {
       {'file': '/workspace/filter_bank.dart', 'line': 42, 'col': 3},
       {
         'file': '/workspace/filter_bank.sv',
-        'line': 87,
-        'col': 1,
+        'line': 87.0,
+        'col': 1.0,
         'desc': 'generated output',
       },
     ];

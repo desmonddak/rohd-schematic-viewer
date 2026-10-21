@@ -1,5 +1,6 @@
 ## 0.2.5
 
+- Fix Go to Source in the VS Code Wasm renderer by accepting numeric FLC line and column values in both direct navigation and the frame-selection popup.
 - Add hierarchy-first indexed loading for standalone and VS Code netlist files, using bounded reads instead of buffering the whole file and fetching connectivity on demand. Start with child blocks only, preserve opaque blocks and expansion controls, and leave debugger loading unchanged.
 - Show MB loaded/total and explicit loading, hierarchy-building, and connectivity stages. Improve scan performance, detect file changes, and bound read and cancellation waits to avoid indefinite loading. Cover native, Wasm, and JavaScript loading with regression tests.
 - Broaden the hierarchy dependency constraint to accept 0.1.x and 0.2.x and the DevTools widgets constraint to accept 0.1.1 through 0.2.x without requiring the new widgets release first.
