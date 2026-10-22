@@ -75,6 +75,15 @@ unzip -p "$VSIX" extension/flutter_web/flutter_bootstrap.js |
   '
 
 pubspec_version="$(awk '/^version:/ { print $2; exit }' "$ROOT/pubspec.yaml")"
+source_version="$(
+  node -p 'require(process.argv[1]).version' "$ROOT/package.json"
+)"
+lock_version="$(
+  node -p 'require(process.argv[1]).version' "$ROOT/package-lock.json"
+)"
+lock_root_version="$(
+  node -p 'require(process.argv[1]).packages[""].version' "$ROOT/package-lock.json"
+)"
 source_publisher="$(
   node -p 'require(process.argv[1]).publisher' "$ROOT/package.json"
 )"
@@ -86,8 +95,14 @@ package_publisher="$(
   unzip -p "$VSIX" extension/package.json |
     node -e 'let input = ""; process.stdin.on("data", c => input += c); process.stdin.on("end", () => console.log(JSON.parse(input).publisher));'
 )"
-[[ "$package_version" == "$pubspec_version" ]] ||
-  fail "VSIX package version $package_version does not match pubspec $pubspec_version"
+[[ "$source_version" == "$pubspec_version" ]] ||
+  fail "package.json version $source_version does not match pubspec $pubspec_version"
+[[ "$lock_version" == "$pubspec_version" ]] ||
+  fail "package-lock.json version $lock_version does not match pubspec $pubspec_version"
+[[ "$lock_root_version" == "$pubspec_version" ]] ||
+  fail "package-lock.json root version $lock_root_version does not match pubspec $pubspec_version"
+[[ "$package_version" == "$source_version" ]] ||
+  fail "VSIX package version $package_version does not match package.json $source_version"
 [[ "$package_publisher" == "$source_publisher" ]] ||
   fail "VSIX package publisher $package_publisher does not match package.json $source_publisher"
 [[ "$package_publisher" == "intel-corporation" ]] ||

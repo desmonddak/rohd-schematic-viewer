@@ -107,6 +107,7 @@ Common targets:
 | `make linux-run-profile` | Run Linux app in profile mode |
 | `make linux-run-release` | Run Linux app in release mode |
 | `make build` / `make extension` / `make vsix` | Build the Marketplace-ready VSIX |
+| `make verify-extension-version` | Verify that the Pub package and extension manifests use one version |
 | `make verify-vsix` | Verify VSIX structure and the Wasm/JavaScript fallback assets |
 | `make install-local` | Install the VSIX into local VS Code |
 | `make install-remote` / `make install` | Install the VSIX into VS Code Server |
@@ -114,6 +115,16 @@ Common targets:
 | `make real-clean` | Run `make clean`, `flutter clean`, remove Node dependencies, dependency-source task state, and staged generated assets |
 
 Use `make help` for the current target list.
+
+### Pub and VSIX Version Alignment
+
+The published Dart package and VSIX share one release version. The root
+[`pubspec.yaml`](../pubspec.yaml) is canonical;
+[`package.json`](../package.json) and
+[`package-lock.json`](../package-lock.json) must contain the same version.
+Packaging and Marketplace CI run `make verify-extension-version` and fail on
+drift. After intentionally changing the Pub version, run `make sync-version`,
+commit the manifest updates, and use the matching `v<version>` release tag.
 
 ### Dart Coverage
 
